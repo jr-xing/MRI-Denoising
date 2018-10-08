@@ -1,0 +1,21 @@
+#!/bin/bash
+# Test if path is empty
+path1="/"
+path2="/mnt/cigserver2_jiarui_xing"
+
+# if [ -z "$(ls -A $path1)" ]; then
+if find $path1 -mindepth 1 | read; then
+   echo "$path1 not empty"
+else
+   echo "$path1 empty"
+fi
+
+
+# if [ -z "$(ls -A /mnt/cigserver2_jiarui_xing)" ]; then
+if find $path2 -mindepth 1 | read; then
+   echo "server2 not empty"
+else
+   echo "server2 empty"
+fi
+
+

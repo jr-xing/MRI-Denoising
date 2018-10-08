@@ -1,0 +1,28 @@
+#!/bin/bash
+# Set default comment
+if [!$1]; then
+	$1="update"
+fi
+
+# Push
+git add .
+git commit -m $1
+git push
+
+# Sync server1
+path_server1="/mnt/cigserver1_jiarui_xing"
+path_server2="/mnt/cigserver2_jiarui_xing"
+
+if find $path_server1 -mindepth 1 | read; then
+   cd "/mnt/cigserver1_jiarui_xing/MRI/workSpace/code"
+   git pull
+else
+   echo "server1 empty"
+fi
+
+if find $path_server2 -mindepth 1 | read; then
+   cd "/mnt/cigserver2_jiarui_xing/Projects/MRI/workSpace/code"
+   git pull
+else
+   echo "server2 empty"
+fi
