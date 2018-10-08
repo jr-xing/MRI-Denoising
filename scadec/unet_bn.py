@@ -305,7 +305,7 @@ class Unet_bn(object):
                 raise ValueError("Unknown cost function: "+cost_dict['name'])
 
             if cost_dict.get('upper_bound',False):
-                current_loss =  tf.clip_by_value(current_loss, 0.0, 0.5)
+                current_loss =  tf.clip_by_value(current_loss, 0.0, cost_dict.get('upper_bound',0.5))
             
             loss += cost_dict['weight']*current_loss
             loss_dict[cost_dict['edge_type']] = current_loss
