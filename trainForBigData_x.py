@@ -246,12 +246,12 @@ if ('3C' in para_dict_use['Ob']):
     if 'motion' in para_dict_use['Ob']:
         if ('FULL_SEG' in para_dict_use['Ob']):            
             # data = h5py_mat2npy('train_np/traOb_FULL_SEG_neigh_motion_part_1.mat')
-            data1 = h5py_mat2npy('train_np/traOb_FULL_SEG_neigh_motion_part_1.mat')
-            data2 = h5py_mat2npy('train_np/traOb_FULL_SEG_neigh_motion_part_2.mat')
-            data3 = h5py_mat2npy('train_np/traOb_FULL_SEG_neigh_motion_part_3.mat')
+            data1 = h5py_mat2npy('../data/train_np/traOb_FULL_SEG_neigh_motion_part_1.mat')
+            data2 = h5py_mat2npy('../data/train_np/traOb_FULL_SEG_neigh_motion_part_2.mat')
+            data3 = h5py_mat2npy('../data/train_np/traOb_FULL_SEG_neigh_motion_part_3.mat')
             data  = np.concatenate([data1, data2, data3], axis=0)    
             del(data1, data2, data3)
-            vdata = h5py_mat2npy('valid_np/valOb_neigh_motion.mat')
+            vdata = h5py_mat2npy('../data/valid_np/valOb_neigh_motion.mat')
             
 
 # Output
@@ -262,12 +262,12 @@ else:
     truth_channels = 1
     if ('FULL_SEG' in para_dict_use['Gt']):
         # truths = h5py_mat2npy('train_np/traGt_FULL_SEG_part_1.mat')
-        truths1 = h5py_mat2npy('train_np/traGt_FULL_SEG_part_1.mat')
-        truths2 = h5py_mat2npy('train_np/traGt_FULL_SEG_part_2.mat')
-        truths3 = h5py_mat2npy('train_np/traGt_FULL_SEG_part_3.mat')
+        truths1 = h5py_mat2npy('../data/train_np/traGt_FULL_SEG_part_1.mat')
+        truths2 = h5py_mat2npy('../data/train_np/traGt_FULL_SEG_part_2.mat')
+        truths3 = h5py_mat2npy('../data/train_np/traGt_FULL_SEG_part_3.mat')
         truths  = np.concatenate([truths1, truths2, truths3], axis=0)
         del(truths1, truths2, truths3)                
-        vtruths = h5py_mat2npy('valid_np/valGt.mat')
+        vtruths = h5py_mat2npy('../data/valid_np/valGt.mat')
         
 valid_provider = image_util.SimpleDataProvider(vdata, vtruths)
 data_provider = image_util.SimpleDataProvider(data, truths)
@@ -319,8 +319,10 @@ valid_size = 5  # batch size for validating
 optimizer = "adam"  # optimizer we want to use, 'adam' or 'momentum'
 
 # # output paths for results
-output_path = 'gpu' + gpu_ind + '/' + para_str_use + '/models'
-prediction_path = 'gpu' + gpu_ind + '/' + para_str_use + '/validation'
+# output_path = 'gpu' + gpu_ind + '/' + para_str_use + '/models'
+# prediction_path = 'gpu' + gpu_ind + '/' + para_str_use + '/validation'
+output_path = '../result/gpu' + gpu_ind + '/' + para_str_use + '/models'
+prediction_path = '../result/gpu' + gpu_ind + '/' + para_str_use + '/validation'
 
 # # optional args
 opt_kwargs = {
