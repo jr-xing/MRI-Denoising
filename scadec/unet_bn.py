@@ -35,8 +35,7 @@ from scadec.nets import *
 
 sys.path.append(os.path.join(os.path.dirname(sys.path[0]), "./"))
 sys.path.append(os.path.join(os.path.dirname(sys.path[0]), "./scadec/"))
-from scadec.custom_vgg16 import *
-from scadec.fast_transfer_net import *
+
 
 # from IPython.core.debugger import Tracer
 # import ipdb
@@ -278,6 +277,7 @@ class Unet_bn(object):
                 mask = get_mask(mode=cost_dict.get('mask',None),img_h=320,img_w=320)                
                 loss_l2 = tf.losses.mean_squared_error(tf.multiply(self.recons,mask), tf.multiply(self.y,mask))
                 current_loss = loss_l2
+                current_loss_name = 'mean_square_error'
                 #loss += cost_dict['weight']*loss_l2
                 #loss_dict['meaｎ_square_loss'] = loss_l2
 
@@ -290,17 +290,15 @@ class Unet_bn(object):
                     edge_y = get_edge(y_masked, operator=cost_dict['edge_type'])
                     loss_masked_edge = tf.losses.mean_squared_error(edge_recons, edge_y)   
                     current_loss = loss_masked_edge
-
-                    # loss += loss_masked_edge
-                    # loss_dict[cost_dict['edge_type']] = loss_masked_edge
+                    current_loss_name = cost_dict['edge_type']
 
                 else:                    
                     edge_recons = get_edge(self.recons, operator=cost_dict['edge_type'])
                     edge_y = get_edge(self.y, operator=cost_dict['edge_type'])
                     loss_edge_masked = tf.losses.mean_squared_error(tf.multiply(edge_recons, mask), tf.multiply(edge_y, mask))
                     current_loss = loss_edge_masked
-                    #loss += loss_edge_masked
-                    #loss_dict[cost_dict['edge_type']] = loss_edge_masked                
+                    current_loss_name = cost_dict['edge_type']
+
             else:
                 raise ValueError("Unknown cost function: "+cost_dict['name'])
 
@@ -308,7 +306,7 @@ class Unet_bn(object):
                 current_loss =  tf.clip_by_value(current_loss, 0.0, cost_dict.get('upper_bound',0.5))
             
             loss += cost_dict['weight']*current_loss
-            loss_dict[cost_dict['edge_type']] = current_loss
+            loss_dict[current_loss_name] = current_loss
 
         loss_dict['total_loss'] = loss    
 

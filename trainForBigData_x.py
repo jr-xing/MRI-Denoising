@@ -186,7 +186,7 @@ para_dict_17 = {
 
 
 # Re-run 18 and 16 and 17
-para_str_19 = para_str_16
+para_str_19 = 'Idx_19-Loss_l2_masked_mid5-Loss-Sobel_masked_mid5_w2-Reg_no-Drop_0.9-Ob_FULL_SEG_3C_motion-Gt_FULL_SEG'
 para_dict_19 = para_dict_16
 para_dict_19['GPU_IND'] = '3'
 
@@ -221,13 +221,13 @@ para_dict_20 = {
         "get_loss_dict": True
     },
     'optimizer': 'adam_clip',
-    'GPU_IND':2
+    'GPU_IND':'3'
 }
 
 
 
-para_dict_use = para_dict_15_2
-para_str_use = para_str_15_2
+para_dict_use = para_dict_20
+para_str_use = para_str_20
 
 # here indicating the GPU you want to use. if you don't have GPU, just leave it.
 gpu_ind = para_dict_use.get('GPU_IND', '3')
