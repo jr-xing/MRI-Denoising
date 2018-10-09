@@ -224,10 +224,42 @@ para_dict_20 = {
     'GPU_IND':'2'
 }
 
+# 	Loss_l2_masked_mid5-Loss-LoG_masked_mid5-Reg_no-Drop_0.9-Ob_FULL_SEG_3C_motion-Gt_FULL_SEG
+para_str_21 = 'Idx_21-Loss_l2_masked_mid5-Loss-LoG_masked_mid5-Reg_no-Drop_0.9-Ob_FULL_SEG_3C_motion-Gt_FULL_SEG'
+para_dict_21 = {
+    'idx':21,
+    'losses':[
+        {
+        'name':'l2',
+        'weight':1,
+        'mask':'mid5'},
+        {
+        'name':'edge',
+        'edge_type':'LoG',
+        'weight':10,
+        'mask':'mid5',
+        'mask_before_operate':False,
+        'upper_bound': 0.1
+        }],
+    'reg':None,
+    'Keep':0.9,
+    'Ob':'FULL_SEG_3C_motion',
+    'Gt':'FULL_SEG',
+    'kwargs' : {
+        "layers": 5,           # how many resolution levels we want to have
+        "conv_times": 2,       # how many times we want to convolve in each level
+        "features_root": 64,   # how many feature_maps we want to have as root (the following levels will calculate the feature_map by multiply by 2, exp, 64, 128, 256)
+        "filter_size": 3,      # filter size used in convolution
+        "pool_size": 2,        # pooling size used in max-pooling
+        "summaries": True,
+        "get_loss_dict": True
+    },
+    'optimizer': 'adam_clip',
+    'GPU_IND':'3'
+}
 
-
-para_dict_use = para_dict_19
-para_str_use = para_str_19
+para_dict_use = para_dict_21
+para_str_use = para_str_21
 
 # here indicating the GPU you want to use. if you don't have GPU, just leave it.
 gpu_ind = para_dict_use.get('GPU_IND', '3')
