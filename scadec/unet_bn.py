@@ -311,7 +311,7 @@ class Unet_bn(object):
                     if cost_dict.get('get_XY',False):
                         edge_recons_X,edge_recons_Y = get_edge(self.recons, operator=cost_dict['edge_type'], get_XY=True)
                         edge_y_X,edge_y_Y = get_edge(self.y, operator=cost_dict['edge_type'], get_XY=True)
-                        loss_masked_edge = tf.losses.absolute_difference(tf.multiply(edge_recons_X,mask), tf.multiply(edge_y_X,mask)) + \
+                        loss_edge_masked = tf.losses.absolute_difference(tf.multiply(edge_recons_X,mask), tf.multiply(edge_y_X,mask)) + \
                                             tf.losses.absolute_difference(tf.multiply(edge_recons_Y,mask), tf.multiply(edge_y_Y,mask))
                     else:
                         edge_recons = get_edge(self.recons, operator=cost_dict['edge_type'])
