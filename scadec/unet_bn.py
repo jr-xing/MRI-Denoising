@@ -246,7 +246,7 @@ class Unet_bn(object):
         #     imgY = tf.nn.conv2d(img, sobelY, strides=[1,1,1,1], padding='SAME')[:,1:-1,1:-1,:]
         #     return tf.sqrt(tf.square(imgX)+tf.square(imgY))
 
-        def get_edge(img, operator):
+        def get_edge(img, operator, get_XY = False):
             # https://blog.csdn.net/huanghuangjin/article/details/81130171
             # https://www.cnblogs.com/wxl845235800/p/7700867.html
             if operator == 'gradient':
@@ -254,14 +254,20 @@ class Unet_bn(object):
                 gradY = tf.reshape(tf.constant([[0,1,0],[0,0,0],[0,-1,0]],tf.float32),[3, 3, 1, 1])
                 imgX = tf.nn.conv2d(img, gradX, strides=[1,1,1,1], padding='SAME')
                 imgY = tf.nn.conv2d(img, gradY, strides=[1,1,1,1], padding='SAME')
-                return tf.sqrt(tf.square(imgX)+tf.square(imgY))
+                if get_XY:
+                    return imgX, imgY
+                else:
+                    return tf.sqrt(tf.square(imgX)+tf.square(imgY))
 
             elif operator == 'Sobel' or operator == 'sobel':
                 sobelX = tf.reshape(tf.constant([[1,0,-1],[2,0,-2],[1,0,-1]],tf.float32),[3, 3, 1, 1])
                 sobelY = tf.reshape(tf.constant([[1,2,1],[0,0,0],[-1,-2,-1]],tf.float32),[3, 3, 1, 1])
                 imgX = tf.nn.conv2d(img, sobelX, strides=[1,1,1,1], padding='SAME')
                 imgY = tf.nn.conv2d(img, sobelY, strides=[1,1,1,1], padding='SAME')
-                return tf.sqrt(tf.square(imgX)+tf.square(imgY))
+                if get_XY:
+                    return imgX, imgY
+                else:
+                    return tf.sqrt(tf.square(imgX)+tf.square(imgY))
 
             elif operator == 'LoG':
                 # Laplacian of Gaussian (LoG)
@@ -284,18 +290,33 @@ class Unet_bn(object):
             elif cost_dict['name'] == 'edge':
                 mask = get_mask(mode=cost_dict.get('mask',None),img_h=320,img_w=320)
                 if cost_dict.get('mask_before_operate',False):
+                    # Get masked images
                     recons_masked = tf.multiply(self.recons, mask)
                     y_masked = tf.multiply(self.y, mask)
-                    edge_recons = get_edge(recons_masked, operator=cost_dict['edge_type'])
-                    edge_y = get_edge(y_masked, operator=cost_dict['edge_type'])
-                    loss_masked_edge = tf.losses.mean_squared_error(edge_recons, edge_y)   
+
+                    # Compute edge loss
+                    if cost_dict.get('get_XY',False):
+                        edge_recons_X,edge_recons_Y = get_edge(recons_masked, operator=cost_dict['edge_type'], get_XY=True)
+                        edge_y_X,edge_y_Y = get_edge(y_masked, operator=cost_dict['edge_type'], get_XY=True)
+                        loss_masked_edge = tf.losses.absolute_difference(edge_recons_X, edge_y_X)+tf.losses.absolute_difference(edge_recons_Y, edge_y_Y)
+                    else:
+                        edge_recons = get_edge(recons_masked, operator=cost_dict['edge_type'])
+                        edge_y = get_edge(y_masked, operator=cost_dict['edge_type'])
+                        loss_masked_edge = tf.losses.mean_squared_error(edge_recons, edge_y)   
+                    # Loss
                     current_loss = loss_masked_edge
                     current_loss_name = cost_dict['edge_type']
 
                 else:                    
-                    edge_recons = get_edge(self.recons, operator=cost_dict['edge_type'])
-                    edge_y = get_edge(self.y, operator=cost_dict['edge_type'])
-                    loss_edge_masked = tf.losses.mean_squared_error(tf.multiply(edge_recons, mask), tf.multiply(edge_y, mask))
+                    if cost_dict.get('get_XY',False):
+                        edge_recons_X,edge_recons_Y = get_edge(self.recons, operator=cost_dict['edge_type'], get_XY=True)
+                        edge_y_X,edge_y_Y = get_edge(self.y, operator=cost_dict['edge_type'], get_XY=True)
+                        loss_masked_edge = tf.losses.absolute_difference(tf.multiply(edge_recons_X,mask), tf.multiply(edge_y_X,mask)) + \
+                                            tf.losses.absolute_difference(tf.multiply(edge_recons_Y,mask), tf.multiply(edge_y_Y,mask))
+                    else:
+                        edge_recons = get_edge(self.recons, operator=cost_dict['edge_type'])
+                        edge_y = get_edge(self.y, operator=cost_dict['edge_type'])
+                        loss_edge_masked = tf.losses.mean_squared_error(tf.multiply(edge_recons, mask), tf.multiply(edge_y, mask))
                     current_loss = loss_edge_masked
                     current_loss_name = cost_dict['edge_type']
 
