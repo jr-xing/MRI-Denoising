@@ -48,6 +48,26 @@ def mouth_func(dict, mode='default'):
         if sliceIdx < 0:
             return dict['a']
 
+def assign_silce_idx(total_count, binSliceStart=1, binSliceEnd=96):
+    # if       10:80 in 1:96
+    #    idx:  0:71 -> 10:80
+    binLength = binSliceEnd-binSliceStart+1
+    if total_count % binLength == 0:
+        binCount = int(total_count/binLength)
+    else:
+        raise ValueError("Don't match!")
+    return list(range(binSliceStart, binSliceEnd+1))*binCount
+
+def add_additional_info(ori_dict_list, new_info_list, key_name):
+    if ori_dict_list == None:
+        ori_dict_list = [{}]*len(new_info_list)
+
+    for idx in range(len(ori_dict_list)):
+        ori_dict_list[idx][key_name] = new_info_list[idx]
+    return ori_dict_list   
+
+
+
 ####################################################
 ####              HYPER-PARAMETERS               ###
 ####################################################
@@ -328,6 +348,39 @@ para_dict_23 = {
     'GPU_IND':'2'
 }
 
+para_str_24 = 'Idx_23-Loss_l2_masked_mid5-Loss-gradient_XY_masked_mid5-Reg_no-Drop_0.9-Ob_FULL_SEG_3C_motion-Gt_FULL_SEG-Hydra_8'
+para_dict_24 = {
+    'idx':24,
+    'losses':[
+        {
+        'name':'l2',
+        'weight':1,
+        'mask':'mid5'},
+        {
+        'name':'edge',
+        'edge_type':'gradient',
+        'weight':10,
+        'mask':'mid5',
+        'mask_before_operate':False,
+        'get_XY':True
+        }],
+    'reg':None,
+    'Keep':0.9,
+    'Ob':'FULL_SEG_3C_motion',
+    'Gt':'FULL_SEG',
+    'kwargs' : {
+        "layers": 5,           # how many resolution levels we want to have
+        "conv_times": 2,       # how many times we want to convolve in each level
+        "features_root": 64,   # how many feature_maps we want to have as root (the following levels will calculate the feature_map by multiply by 2, exp, 64, 128, 256)
+        "filter_size": 3,      # filter size used in convolution
+        "pool_size": 2,        # pooling size used in max-pooling
+        "summaries": True,
+        "get_loss_dict": True
+    },
+    'optimizer': 'adam',
+    'GPU_IND':'2'
+}
+
 para_dict_use = para_dict_23
 para_str_use = para_str_23
 
@@ -353,8 +406,11 @@ if ('3C' in para_dict_use['Ob']):
             data2 = h5py_mat2npy('../data/train_np/traOb_FULL_SEG_neigh_motion_part_2.mat')
             data3 = h5py_mat2npy('../data/train_np/traOb_FULL_SEG_neigh_motion_part_3.mat')
             data  = np.concatenate([data1, data2, data3], axis=0)    
+            data_slice_idx_info = add_additional_info(None, assign_silce_idx(np.shape(data)[0]), 'slice_idx')
             del(data1, data2, data3)
             vdata = h5py_mat2npy('../data/valid_np/valOb_neigh_motion.mat')
+            vdata_slice_idx_info = add_additional_info(None, assign_silce_idx(np.shape(vdata)[0]), 'slice_idx')
+
             
 
 # Output
@@ -372,8 +428,11 @@ else:
         del(truths1, truths2, truths3)                
         vtruths = h5py_mat2npy('../data/valid_np/valGt.mat')
         
-valid_provider = image_util.SimpleDataProvider(vdata, vtruths)
-data_provider = image_util.SimpleDataProvider(data, truths)
+
+data_provider = image_util.SimpleDataProvider(data, truths, additional_info = data_slice_idx_info
+                                                )
+valid_provider = image_util.SimpleDataProvider(vdata, vtruths, vdata_slice_idx_info = vdata_slice_idx_info)
+
 
 # -----------------------------------Loss------------------------------------------------------- #
 losses_dict = para_dict_use['losses']
