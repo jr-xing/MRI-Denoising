@@ -1,7 +1,7 @@
-from scadec.unet_bn import Unet_bn
-from scadec.train import Trainer_bn
+from scadec_Hydra.unet_bn_Hydra import Unet_bn
+from scadec_Hydra.train_Hydra import Trainer_bn
 
-from scadec import image_util
+from scadec_Hydra import image_util
 
 import scipy.io as spio
 import numpy as np
@@ -55,12 +55,15 @@ def assign_silce_idx(total_count, binSliceStart=1, binSliceEnd=96):
     if total_count % binLength == 0:
         binCount = int(total_count/binLength)
     else:
-        raise ValueError("Don't match!")
+        raise ValueError("total_count {} and binLength {} Don't match!".format(total_count, binLength))
     return list(range(binSliceStart, binSliceEnd+1))*binCount
 
 def add_additional_info(ori_dict_list, new_info_list, key_name):
     if ori_dict_list == None:
         ori_dict_list = [{}]*len(new_info_list)
+
+    if len(ori_dict_list) != len(new_info_list):
+        raise ValueError("ori dict len {} and info list len {} don't match!".format(len(ori_dict_list), len(new_info_list)))
 
     for idx in range(len(ori_dict_list)):
         ori_dict_list[idx][key_name] = new_info_list[idx]
@@ -317,7 +320,7 @@ para_dict_22 = {
 
 para_str_23 = 'Idx_23-Loss_l2_masked_mid5-Loss-gradient_XY_masked_mid5-Reg_no-Drop_0.9-Ob_FULL_SEG_3C_motion-Gt_FULL_SEG'
 para_dict_23 = {
-    'idx':22,
+    'idx':23,
     'losses':[
         {
         'name':'l2',
@@ -348,7 +351,7 @@ para_dict_23 = {
     'GPU_IND':'2'
 }
 
-para_str_24 = 'Idx_23-Loss_l2_masked_mid5-Loss-gradient_XY_masked_mid5-Reg_no-Drop_0.9-Ob_FULL_SEG_3C_motion-Gt_FULL_SEG-Hydra_8'
+para_str_24 = 'Idx_24-Loss_l2_masked_mid5-Loss-gradient_XY_masked_norm-Reg_no-Drop_0.9-Ob_FULL_SEG_3C_motion-Gt_FULL_SEG-Hydra_8'
 para_dict_24 = {
     'idx':24,
     'losses':[
@@ -360,7 +363,7 @@ para_dict_24 = {
         'name':'edge',
         'edge_type':'gradient',
         'weight':10,
-        'mask':'mid5',
+        'mask':'norm',
         'mask_before_operate':False,
         'get_XY':True
         }],
@@ -381,8 +384,38 @@ para_dict_24 = {
     'GPU_IND':'2'
 }
 
-para_dict_use = para_dict_23
-para_str_use = para_str_23
+# para_str_24 = 'Idx_24-Test'
+# para_dict_24 = {
+#     'idx':24,
+#     'losses':[
+#         {
+#         'name':'l2',
+#         'weight':1,
+#         'mask':'mid5'},
+#         {
+#         'name':'edge',
+#         'edge_type':'LoG',
+#         'weight':1,
+#         'mask':'norm'}],
+#     'reg':None,
+#     'Keep':0.9,
+#     'Ob':'FULL_SEG_3C_motion',
+#     'Gt':'FULL_SEG',
+#     'kwargs' : {
+#         "layers": 5,           # how many resolution levels we want to have
+#         "conv_times": 2,       # how many times we want to convolve in each level
+#         "features_root": 64,   # how many feature_maps we want to have as root (the following levels will calculate the feature_map by multiply by 2, exp, 64, 128, 256)
+#         "filter_size": 3,      # filter size used in convolution
+#         "pool_size": 2,        # pooling size used in max-pooling
+#         "summaries": True,
+#         "get_loss_dict": True
+#     },
+#     'optimizer': 'adam',
+#     'GPU_IND':'2'
+# }
+
+para_dict_use = para_dict_24
+para_str_use = para_str_24
 
 # here indicating the GPU you want to use. if you don't have GPU, just leave it.
 gpu_ind = para_dict_use.get('GPU_IND', '3')
@@ -397,41 +430,67 @@ os.environ['CUDA_VISIBLE_DEVICES'] = gpu_ind # 0,1,2,3
 # gt_para = [para for para in parameter_parse if para.startswith('Gt')][0]
 # Input
 
-if ('3C' in para_dict_use['Ob']):
-    data_channels = 3 
-    if 'motion' in para_dict_use['Ob']:
-        if ('FULL_SEG' in para_dict_use['Ob']):            
-            # data = h5py_mat2npy('train_np/traOb_FULL_SEG_neigh_motion_part_1.mat')
-            data1 = h5py_mat2npy('../data/train_np/traOb_FULL_SEG_neigh_motion_part_1.mat')
-            data2 = h5py_mat2npy('../data/train_np/traOb_FULL_SEG_neigh_motion_part_2.mat')
-            data3 = h5py_mat2npy('../data/train_np/traOb_FULL_SEG_neigh_motion_part_3.mat')
-            data  = np.concatenate([data1, data2, data3], axis=0)    
-            data_slice_idx_info = add_additional_info(None, assign_silce_idx(np.shape(data)[0]), 'slice_idx')
-            del(data1, data2, data3)
-            vdata = h5py_mat2npy('../data/valid_np/valOb_neigh_motion.mat')
-            vdata_slice_idx_info = add_additional_info(None, assign_silce_idx(np.shape(vdata)[0]), 'slice_idx')
+TEST_MODE = False
+if TEST_MODE:
+    if ('3C' in para_dict_use['Ob']):
+        data_channels = 3 
+        if 'motion' in para_dict_use['Ob']:
+            if ('FULL_SEG' in para_dict_use['Ob']):            
+                # data = h5py_mat2npy('train_np/traOb_FULL_SEG_neigh_motion_part_1.mat')            
+                # data = h5py_mat2npy('../data/train_np/traOb_FULL_SEG_neigh_motion_part_1.mat')
+                # data_slice_idx_info = add_additional_info(None, assign_silce_idx(np.shape(data)[0]), 'slice_idx')
+                data = h5py_mat2npy('../data/valid_np/valOb_neigh_motion.mat')
+                data_slice_idx_info = add_additional_info(None, np.arange(100, 245+1, 5), 'slice_idx')                
+                vdata = h5py_mat2npy('../data/valid_np/valOb_neigh_motion.mat')
+                vdata_slice_idx_info = add_additional_info(None, np.arange(100, 245+1, 5), 'slice_idx')                
 
-            
-
-# Output
-if ('3C' in para_dict_use['Gt']):
-    truth_channels = 3
-    pass
+    # Output
+    if ('3C' in para_dict_use['Gt']):
+        truth_channels = 3
+        pass
+    else:
+        truth_channels = 1
+        if ('FULL_SEG' in para_dict_use['Gt']):
+            # truths = h5py_mat2npy('train_np/traGt_FULL_SEG_part_1.mat')            
+            # truths = h5py_mat2npy('../data/train_np/traGt_FULL_SEG_part_1.mat')
+            truths = h5py_mat2npy('../data/valid_np/valGt.mat')
+            vtruths = h5py_mat2npy('../data/valid_np/valGt.mat')
 else:
-    truth_channels = 1
-    if ('FULL_SEG' in para_dict_use['Gt']):
-        # truths = h5py_mat2npy('train_np/traGt_FULL_SEG_part_1.mat')
-        truths1 = h5py_mat2npy('../data/train_np/traGt_FULL_SEG_part_1.mat')
-        truths2 = h5py_mat2npy('../data/train_np/traGt_FULL_SEG_part_2.mat')
-        truths3 = h5py_mat2npy('../data/train_np/traGt_FULL_SEG_part_3.mat')
-        truths  = np.concatenate([truths1, truths2, truths3], axis=0)
-        del(truths1, truths2, truths3)                
-        vtruths = h5py_mat2npy('../data/valid_np/valGt.mat')
+    if ('3C' in para_dict_use['Ob']):
+        data_channels = 3 
+        if 'motion' in para_dict_use['Ob']:
+            if ('FULL_SEG' in para_dict_use['Ob']):            
+                # data = h5py_mat2npy('train_np/traOb_FULL_SEG_neigh_motion_part_1.mat')
+                data1 = h5py_mat2npy('../data/train_np/traOb_FULL_SEG_neigh_motion_part_1.mat')
+                data2 = h5py_mat2npy('../data/train_np/traOb_FULL_SEG_neigh_motion_part_2.mat')
+                data3 = h5py_mat2npy('../data/train_np/traOb_FULL_SEG_neigh_motion_part_3.mat')
+                data  = np.concatenate([data1, data2, data3], axis=0)    
+                #100:5:245
+                data_slice_idx_info = add_additional_info(None, assign_silce_idx(np.shape(data)[0]), 'slice_idx')
+                del(data1, data2, data3)
+                vdata = h5py_mat2npy('../data/valid_np/valOb_neigh_motion.mat')
+                vdata_slice_idx_info = add_additional_info(None, np.arange(100, 245+1, 5), 'slice_idx')
+
+                
+
+    # Output
+    if ('3C' in para_dict_use['Gt']):
+        truth_channels = 3
+        pass
+    else:
+        truth_channels = 1
+        if ('FULL_SEG' in para_dict_use['Gt']):
+            # truths = h5py_mat2npy('train_np/traGt_FULL_SEG_part_1.mat')
+            truths1 = h5py_mat2npy('../data/train_np/traGt_FULL_SEG_part_1.mat')
+            truths2 = h5py_mat2npy('../data/train_np/traGt_FULL_SEG_part_2.mat')
+            truths3 = h5py_mat2npy('../data/train_np/traGt_FULL_SEG_part_3.mat')
+            truths  = np.concatenate([truths1, truths2, truths3], axis=0)
+            del(truths1, truths2, truths3)                
+            vtruths = h5py_mat2npy('../data/valid_np/valGt.mat')
         
 
-data_provider = image_util.SimpleDataProvider(data, truths, additional_info = data_slice_idx_info
-                                                )
-valid_provider = image_util.SimpleDataProvider(vdata, vtruths, vdata_slice_idx_info = vdata_slice_idx_info)
+data_provider = image_util.SimpleDataProvider(data, truths, data_additional_info = data_slice_idx_info)
+valid_provider = image_util.SimpleDataProvider(vdata, vtruths, data_additional_info = vdata_slice_idx_info)
 
 
 # -----------------------------------Loss------------------------------------------------------- #

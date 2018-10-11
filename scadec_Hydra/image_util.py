@@ -33,15 +33,15 @@ class BaseDataProvider(object):
     def __call__(self, n, fix=False, rand_y = False):
         if type(n) == int and not fix:
             # X and Y are the images and truths
-            train_data, truths = self._next_batch(n, rand_y)
+            train_data, truths, XInfo = self._next_batch(n, rand_y)
         elif type(n) == int and fix:
-            train_data, truths = self._fix_batch(n)
+            train_data, truths, XInfo = self._fix_batch(n)
         elif type(n) == str and n == 'full':
-            train_data, truths = self._full_batch() 
+            train_data, truths, XInfo = self._full_batch() 
         else:
             raise ValueError("Invalid batch_size: "%n)
         
-        return train_data, truths
+        return train_data, truths, XInfo
 
     def _next_batch(self, n):
         pass

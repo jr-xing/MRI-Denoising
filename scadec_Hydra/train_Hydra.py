@@ -27,7 +27,7 @@ from collections import OrderedDict
 import logging
 
 import tensorflow as tf
-from scadec import util
+from scadec_Hydra import util
 
 SHORT_INFO = False
 #from IPython.core.debugger import Tracer
@@ -254,7 +254,8 @@ class Trainer_bn(object):
                     directory = os.path.join(output_path, "{}_cpkt/".format(step))
                     if not os.path.exists(directory):
                         os.makedirs(directory)
-                    path = os.path.join(directory, "model.cpkt".format(step))      
+                    #path = os.path.join(directory, "model.cpkt".format(step))      
+                    path = os.path.join(directory, "model.cpkt")
                     self.net.save(sess, path)
 
                 save_path = self.net.save(sess, save_path)

@@ -142,24 +142,10 @@ class Unet_bn(object):
         # dprint('_get_cost')
         total_pixels = self.nx * self.ny * self.truth_channels
 
-        def get_mask(img = None, mode = 'default', img_h = None, img_w = None):
-            # Get image shape
-            if img != None:
-                img_shape = img.get_shape().as_list()
-
-            if img_h != None:
-                h = img_h
-            else:
-                h = img_shape[1]
-
-            if img_w != None:
-                w = img_w
-            else:
-                w = img_shape[2]
-
+        def get_mask(mode = 'default', h = 320, w = 320):
             # Generate mask
             if mode == None:
-                mask = np.ones([w, h, 1])
+                return np.float32(np.ones([w, h, 1]))                
             elif mode == 'default':
                 mask = np.ones([w, h, 1]) * 0.5
                 mask[:,int(w/3):int(2*w/3),:] = 1
@@ -174,53 +160,64 @@ class Unet_bn(object):
                 from scipy.stats import norm
                 scaleX = 1.2
                 scaleY = 0.8
-                normX = np.linspace(norm.ppf(0.001, scale=scaleX),norm.ppf(0.999,scale=scaleX), img_w)
-                normY = np.linspace(norm.ppf(0.001, scale=scaleY),norm.ppf(0.999,scale=scaleY), img_h)
-                normXX, normYY = np.meshgrid(normX, normY)
-                maskN = norm.pdf(np.abs(normXX)+np.abs(normYY))
-                maskN = (maskN-np.min(maskN))/np.max(maskN)
-                return np.float32(maskN)
-
-        def get_mask_tf(img = None, mode = 'default'):
-            # https://stackoverflow.com/questions/39157723/how-to-do-slice-assignment-in-tensorflow
-            # p1 = tf.placeholder(tf.float32, [None,5,5,3])
-            # mr1 = tf.Variable(tf.ones([5,5,1]), trainable = False)
-            # mr2 = mr1[:3,:3,:].assign(tf.ones([3,3,1])*5)
-            # init = tf.global_variables_initializer()
-            # with tf.Session() as sess:
-            #     sess.run(init)
-            #     print('VALUE:')
-            #     print(sess.run(mr1))
-                
-            # Get image shape            
-            img_shape = img.get_shape().as_list()
-            h = img_shape[1]        
-            w = img_shape[2]
-
-            # Generate mask
-            if mode == None:
-                mask = tf.ones([w, h, 1])
-            elif mode == 'default':
-                mask = tf.ones([w, h, 1]) * 0.5
-                mask = mask[:,int(w/3):int(2*w/3),:].assign(tf.ones([h,int(2*w/3)-int(w/3),1])*1)
-                mask = mask[:,int(w/3):int(2*w/3),:].assign(tf.ones([int(2*h/3)-int(h/3),int(2*w/3)-int(w/3),1])*1.5)
-                return mask
-            elif mode == 'mid5':
-                mask = tf.ones([w, h, 1]) * 0.1
-                mask = mask[:,int(1*w/5):int(4*w/5),:].assign(tf.ones([h,int(4*w/5)-int(1*w/5),1])*0.5)
-                mask = mask[:,int(2*w/5):int(3*w/5),:].assign(tf.ones([h,int(3*w/5)-int(2*w/5),1])*1.5)
-                return mask
-            elif mode == 'norm':
-                from scipy.stats import norm
-                scaleX = 1.2
-                scaleY = 0.8
                 normX = np.linspace(norm.ppf(0.001, scale=scaleX),norm.ppf(0.999,scale=scaleX), w)
                 normY = np.linspace(norm.ppf(0.001, scale=scaleY),norm.ppf(0.999,scale=scaleY), h)
                 normXX, normYY = np.meshgrid(normX, normY)
                 maskN = norm.pdf(np.abs(normXX)+np.abs(normYY))
                 maskN = (maskN-np.min(maskN))/np.max(maskN)
-                # return np.float32(maskN)
-                return tf.constant(maskN)
+                return np.float32(np.reshape(maskN,[w,h,1]))
+        
+        # def apply_mask(img, mode):
+        #     # if mode == None:
+        #     #     return img
+        #     img_shape = img.get_shape().as_list()
+        #     #h, w = img_shape[1:3]
+        #     #mask = get_mask(img, mode, 320, 320)
+        #     mask = np.float32(np.ones([320, 320, 1]))
+        #     print(np.shape(mask))
+        #     return tf.multiply(img, mask)
+
+            
+        # def get_mask_tf(img = None, mode = 'default'):
+        #     # https://stackoverflow.com/questions/39157723/how-to-do-slice-assignment-in-tensorflow
+        #     # p1 = tf.placeholder(tf.float32, [None,5,5,3])
+        #     # mr1 = tf.Variable(tf.ones([5,5,1]), trainable = False)
+        #     # mr2 = mr1[:3,:3,:].assign(tf.ones([3,3,1])*5)
+        #     # init = tf.global_variables_initializer()
+        #     # with tf.Session() as sess:
+        #     #     sess.run(init)
+        #     #     print('VALUE:')
+        #     #     print(sess.run(mr1))
+                
+        #     # Get image shape            
+        #     img_shape = img.get_shape().as_list()
+        #     h = img_shape[1]        
+        #     w = img_shape[2]
+
+        #     # Generate mask
+        #     if mode == None:
+        #         mask = tf.ones([w, h, 1])
+        #     elif mode == 'default':
+        #         mask = tf.ones([w, h, 1]) * 0.5
+        #         mask = mask[:,int(w/3):int(2*w/3),:].assign(tf.ones([h,int(2*w/3)-int(w/3),1])*1)
+        #         mask = mask[:,int(w/3):int(2*w/3),:].assign(tf.ones([int(2*h/3)-int(h/3),int(2*w/3)-int(w/3),1])*1.5)
+        #         return mask
+        #     elif mode == 'mid5':
+        #         mask = tf.ones([w, h, 1]) * 0.1
+        #         mask = mask[:,int(1*w/5):int(4*w/5),:].assign(tf.ones([h,int(4*w/5)-int(1*w/5),1])*0.5)
+        #         mask = mask[:,int(2*w/5):int(3*w/5),:].assign(tf.ones([h,int(3*w/5)-int(2*w/5),1])*1.5)
+        #         return mask
+        #     elif mode == 'norm':
+        #         from scipy.stats import norm
+        #         scaleX = 1.2
+        #         scaleY = 0.8
+        #         normX = np.linspace(norm.ppf(0.001, scale=scaleX),norm.ppf(0.999,scale=scaleX), w)
+        #         normY = np.linspace(norm.ppf(0.001, scale=scaleY),norm.ppf(0.999,scale=scaleY), h)
+        #         normXX, normYY = np.meshgrid(normX, normY)
+        #         maskN = norm.pdf(np.abs(normXX)+np.abs(normYY))
+        #         maskN = (maskN-np.min(maskN))/np.max(maskN)
+        #         # return np.float32(maskN)
+        #         return tf.constant(maskN)
         
         # def get_grad_old(img):
         #     dify = img[:,  1:, :-1,:] - img[:,:-1,:-1,:]
@@ -272,21 +269,26 @@ class Unet_bn(object):
                 # http://academic.mu.edu/phys/matthysd/web226/Lab02.htm
                 LoG = tf.reshape(tf.constant([[0,-1,0],[-1,4,-1],[0,-1,0]],tf.float32),[3, 3, 1, 1])
                 return tf.nn.conv2d(img, LoG, strides=[1,1,1,1], padding='SAME')
+            else:
+                raise ValueError("Unknown edge type: "+operator)
 
         def get_losses(x, y, cost_dict_list):
             loss = 0
             loss_dict = {}
             for cost_dict in cost_dict_list:
                 if cost_dict['name'] == 'l2' or cost_dict['name'] == 'mean_square_error':                
-                    mask = get_mask(mode=cost_dict.get('mask',None),img_h=320,img_w=320)                
+                    # x_masked = apply_mask(x, cost_dict.get('mask',None))
+                    # y_masked = apply_mask(y, cost_dict.get('mask',None))
+                    mask = get_mask(mode=cost_dict.get('mask',None),h=320,w=320)
                     loss_l2 = tf.losses.mean_squared_error(tf.multiply(x,mask), tf.multiply(y,mask))
+                    # loss_l2 = tf.losses.mean_squared_error(x_masked, y_masked)
                     current_loss = loss_l2
-                    current_loss_name = 'mean_square_error'
+                    current_loss_name = cost_dict['name']
                     #loss += cost_dict['weight']*loss_l2
                     #loss_dict['meaｎ_square_loss'] = loss_l2
 
                 elif cost_dict['name'] == 'edge':
-                    mask = get_mask(mode=cost_dict.get('mask',None),img_h=320,img_w=320)
+                    mask = get_mask(mode=cost_dict.get('mask',None),h=320,w=320)
                     if cost_dict.get('mask_before_operate',False):
                         # Get masked images
                         x_masked = tf.multiply(x, mask)
@@ -331,27 +333,36 @@ class Unet_bn(object):
             return loss_dict
         
         def head(img):
+            global sliceIdx
             return img
         
         # Hydra
-        batch_size = tf.shape(self.x)[0]
+        # batch_size = tf.shape(self.x)[0]
         # Create total loss dict
         total_loss_dict = {}
+        total_loss_dict['total_loss'] = 0
         for cost_dict in cost_dict_list:
             if cost_dict['name'] == 'edge':
                 total_loss_dict[cost_dict['edge_type']]=0
             else:
                 total_loss_dict[cost_dict['name']] = 0
 
-        for img_idx in range(batch_size):
+        for img_idx in range(5):
             # Pass through 
-            recon = head(self.recons[img_idx,:,:,:])
-            y = head(self.y[img_idx,:,:,:])
+            # self.img_channels = img_channels
+            # self.truth_channels = truth_channels
+            recon = head(tf.reshape(self.recons[img_idx,:,:,:],[1,320,320,self.truth_channels]))
+            # print(img_idx)
+            # print('recon: ')
+            # print(recon.get_shape().as_list())
+            y = head(tf.reshape(self.y[img_idx,:,:,:],[1,320,320,self.truth_channels]))
+            # print('y: ')
+            # print(y.get_shape().as_list())
 
             # Compute Losses for this single img in batch
             loss_dict = get_losses(recon, y, cost_dict_list)
 
-            for key, value in loss_dict:
+            for key, value in loss_dict.items():
                 total_loss_dict[key] += value
         
         return total_loss_dict
