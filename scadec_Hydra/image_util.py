@@ -22,7 +22,7 @@ from __future__ import print_function, division, absolute_import, unicode_litera
 import glob
 import numpy as np
 from PIL import Image
-
+from scipy import ndimage
 
 class BaseDataProvider(object):
 
@@ -52,18 +52,18 @@ class BaseDataProvider(object):
 
 class SimpleDataProvider(BaseDataProvider):
     
-    def __init__(self, data, truths, img_threshold = 0, data_additional_info = None):
+    def __init__(self, data, truths, data_additional_info = None, process_dict = {}):
         # additional_info should be list of dicts
         super(SimpleDataProvider, self).__init__()
         # Xing
         self.data = data
         self.truths = truths
-        self.img_threshold = img_threshold
         #self.data = np.float64(data)
         #self.truths = np.float64(truths)
         self.img_channels = self.data[0].shape[2]
         self.truth_channels = self.truths[0].shape[2]
         self.file_count = data.shape[0]
+        self.process_dict = process_dict
         
         # Default as list of empty dict
         if data_additional_info == None:
@@ -119,20 +119,10 @@ class SimpleDataProvider(BaseDataProvider):
 
     def _process_truths(self, truth):
         # normalization by channels
-        truth = np.clip(np.fabs(truth), self.a_min, self.a_max)
-        if self.img_threshold != 0:
-            for channel in range(self.truth_channels):
-                truth_channel = truth[:,:,channel]
-                truth_channel -= np.amin(truth[:,:,channel])
-                truth_channel /= np.amax(truth[:,:,channel])
-                truth_channel[truth_channel<self.img_threshold] = 0
-                #truth[:,:,channel] -= np.amin(truth[:,:,channel])
-                #truth[:,:,channel] /= np.amax(truth[:,:,channel])
-                truth[:,:,channel] = truth_channel
-        else:
-            for channel in range(self.truth_channels):
-                truth[:,:,channel] -= np.amin(truth[:,:,channel])
-                truth[:,:,channel] /= np.amax(truth[:,:,channel])
+        truth = np.clip(np.fabs(truth), self.a_min, self.a_max)        
+        for channel in range(self.truth_channels):
+            truth[:,:,channel] -= np.amin(truth[:,:,channel])
+            truth[:,:,channel] /= np.amax(truth[:,:,channel])
         return truth
 
     def _process_data(self, data):
@@ -142,6 +132,18 @@ class SimpleDataProvider(BaseDataProvider):
             data[:,:,channel] -= np.amin(data[:,:,channel])
             data[:,:,channel] /= np.amax(data[:,:,channel])
         return data
+    
+    def _process_single_img_single_chan(self, gray_img, normalize=True):
+        for proc_type, proc_para in self.process_dict.items():
+            if proc_type == 'erosion':
+                gray_img = ndimage.grey_erosion(gray_img, size=proc_para['size']).astype(gray_img.dtype)
+            else:
+                raise ValueError('Unknown processing operation: {}'.format(proc_type))
+
+        if normalize:
+            gray_img -= np.amin(gray_img[:,:])
+            gray_img /= np.amax(gray_img[:,:])
+        return gray_img
 
 def concat_images(imga, imgb):
     """
@@ -170,3 +172,5 @@ def concat_n_images(image_mat):
         else:
             output = concat_images(output, img)
     return output
+
+
