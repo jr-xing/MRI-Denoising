@@ -417,6 +417,40 @@ para_dict_25 = {
     'GPU_IND':'3'
 }
 
+# Redo 24 with lower keep rate
+para_str_26 = 'Idx_26-Loss_l2_masked_mid5-Loss-gradient_XY_masked_norm-Reg_no-Drop_0.8-Ob_FULL_SEG_3C_motion-Gt_FULL_SEG-Hydra_8'
+para_dict_26 = {
+    'idx':26,
+    'losses':[
+        {
+        'name':'l2',
+        'weight':1,
+        'mask':'mid5'},
+        {
+        'name':'edge',
+        'edge_type':'gradient',
+        'weight':10,
+        'mask':'norm',
+        'mask_before_operate':False,
+        'get_XY':True
+        }],
+    'reg':None,
+    'Keep':0.8,
+    'Ob':'FULL_SEG_3C_motion',
+    'Gt':'FULL_SEG',
+    'kwargs' : {
+        "layers": 5,           # how many resolution levels we want to have
+        "conv_times": 2,       # how many times we want to convolve in each level
+        "features_root": 64,   # how many feature_maps we want to have as root (the following levels will calculate the feature_map by multiply by 2, exp, 64, 128, 256)
+        "filter_size": 3,      # filter size used in convolution
+        "pool_size": 2,        # pooling size used in max-pooling
+        "summaries": True,
+        "get_loss_dict": True
+    },
+    'optimizer': 'adam',
+    'GPU_IND':'2'
+}
+
 # para_str_24 = 'Idx_24-Test'
 # para_dict_24 = {
 #     'idx':24,
@@ -447,8 +481,8 @@ para_dict_25 = {
 #     'GPU_IND':'2'
 # }
 
-para_dict_use = para_dict_25
-para_str_use = para_str_25
+para_dict_use = para_dict_26
+para_str_use = para_str_26
 
 # here indicating the GPU you want to use. if you don't have GPU, just leave it.
 gpu_ind = para_dict_use.get('GPU_IND', '3')
