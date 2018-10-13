@@ -519,7 +519,7 @@ para_dict_28 = {
         "get_loss_dict": True
     },
     'proc_dict':{
-        'data':{'erosion':{'size':(2,2)}},
+        'data':{'erosion':{'size':(3,3)}},
         'truth':{}        
     },
     'optimizer': 'adam',
