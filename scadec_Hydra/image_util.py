@@ -121,20 +121,18 @@ class SimpleDataProvider(BaseDataProvider):
         # normalization by channels
         truth = np.clip(np.fabs(truth), self.a_min, self.a_max)        
         for channel in range(self.truth_channels):
-            truth[:,:,channel] -= np.amin(truth[:,:,channel])
-            truth[:,:,channel] /= np.amax(truth[:,:,channel])
+            truth[:,:,channel] = self._process_single_img_single_chan(truth[:,:,channel], 'truth')
         return truth
 
     def _process_data(self, data):
         # normalization by channels
         data = np.clip(np.fabs(data), self.a_min, self.a_max)
         for channel in range(self.img_channels):
-            data[:,:,channel] -= np.amin(data[:,:,channel])
-            data[:,:,channel] /= np.amax(data[:,:,channel])
+            data[:,:,channel] = self._process_single_img_single_chan(data[:,:,channel], 'data')
         return data
     
-    def _process_single_img_single_chan(self, gray_img, normalize=True):
-        for proc_type, proc_para in self.process_dict.items():
+    def _process_single_img_single_chan(self, gray_img, data_or_truth = 'data', normalize=True):
+        for proc_type, proc_para in self.process_dict[data_or_truth].items():
             if proc_type == 'erosion':
                 gray_img = ndimage.grey_erosion(gray_img, size=proc_para['size']).astype(gray_img.dtype)
             else:

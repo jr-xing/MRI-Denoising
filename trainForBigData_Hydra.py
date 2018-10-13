@@ -481,7 +481,8 @@ para_dict_27 = {
         "get_loss_dict": True
     },
     'proc_dict':{
-        'erosion':{'size':(2,2)}        
+        'data':{'erosion':{'size':(2,2)}},
+        'truth':{}        
     },
     'optimizer': 'adam',
     'server': '2',
@@ -593,8 +594,8 @@ else:
             vtruths = h5py_mat2npy('../data/valid_np/valGt.mat')
         
 
-data_provider = image_util.SimpleDataProvider(data, truths, data_additional_info = data_slice_idx_info)
-valid_provider = image_util.SimpleDataProvider(vdata, vtruths, data_additional_info = vdata_slice_idx_info)
+data_provider = image_util.SimpleDataProvider(data, truths, data_additional_info = data_slice_idx_info, process_dict = para_dict_use['proc_dict'])
+valid_provider = image_util.SimpleDataProvider(vdata, vtruths, data_additional_info = vdata_slice_idx_info, process_dict = para_dict_use['proc_dict'])
 
 
 # -----------------------------------Loss------------------------------------------------------- #
