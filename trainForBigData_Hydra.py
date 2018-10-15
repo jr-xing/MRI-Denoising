@@ -41,12 +41,40 @@ def h5py_mat2npy(datemat):
     
     return test_x
 
-def mouth_func(dict, mode='default'):
-    # input dict, return class
-    if mode == 'default':
-        sliceIdx = dict['sliceIdx']
-        if sliceIdx < 0:
-            return dict['a']
+# def mouth_func(dict, mode='default'):
+#     # input dict, return class
+#     if mode == 'default':
+#         sliceIdx = dict['sliceIdx']
+#         if sliceIdx < 0:
+#             return dict['a']
+
+def idx_classify(idx_array, n_classes = 8, mode='equally'):
+    """ Classify images by slice index(location) """
+    class_array = np.ones(np.shape(idx_array), dtype=np.int32)*(-1)
+    if mode == 'equally':
+        interval = int((idx_array.max() - idx_array.min() + 1)/n_classes)
+        for class_idx in range(n_classes-1):
+            idx_start = class_idx * interval + idx_array.min()
+            idx_end = (class_idx+1) * interval + idx_array.min()
+            class_array[(idx_array>=idx_start)&(idx_array<idx_end)] = class_idx
+            # print(idx_end)
+        # print((n_classes-1) * interval)        
+        class_array[(n_classes-1) * interval:] = n_classes - 1
+        return class_array
+
+    elif mode == 'equally_960':
+        interval = int((960 - 1 + 1)/n_classes)
+        for class_idx in range(n_classes-1):
+            idx_start = class_idx * interval + 1
+            idx_end = (class_idx+1) * interval + 1
+            class_array[(idx_array>=idx_start)&(idx_array<idx_end)] = class_idx
+        class_array[(n_classes-1) * interval:] = n_classes - 1
+        return class_array
+    elif mode == 'all_zero':
+        return class_array*0
+
+    else:
+        raise ValueError('Unknown classification method: {}'.format(mode))
 
 def assign_silce_idx(total_count, binSliceStart=1, binSliceEnd=96):
     # if       10:80 in 1:96
@@ -56,17 +84,17 @@ def assign_silce_idx(total_count, binSliceStart=1, binSliceEnd=96):
         binCount = int(total_count/binLength)
     else:
         raise ValueError("total_count {} and binLength {} Don't match!".format(total_count, binLength))
-    return list(range(binSliceStart, binSliceEnd+1))*binCount
+    return np.array(list(range(binSliceStart, binSliceEnd+1))*binCount)
 
-def add_additional_info(ori_dict_list, new_info_list, key_name):
+def add_additional_info_dict_list(ori_dict_list, new_info_list, key_name):
     if ori_dict_list == None:
         ori_dict_list = [{}]*len(new_info_list)
 
     if len(ori_dict_list) != len(new_info_list):
         raise ValueError("ori dict len {} and info list len {} don't match!".format(len(ori_dict_list), len(new_info_list)))
 
-    for idx in range(len(ori_dict_list)):
-        ori_dict_list[idx][key_name] = new_info_list[idx]
+    for data_idx in range(len(ori_dict_list)):
+        ori_dict_list[data_idx][key_name] = new_info_list[data_idx]
     return ori_dict_list   
 
 
@@ -605,7 +633,48 @@ para_dict_30 = {
     'GPU_IND':'3'
 }
 
-
+para_str_31 = 'Idx_31-Loss_l2_masked_mid5-Loss-gradient_XY_masked_norm_invalid_end20-Reg_no-Drop_0.8-Ob_FULL_SEG_3C_motion-Gt_FULL_SEG-Hydra_8'
+para_dict_31 = {
+    'idx':30,
+    'losses':[
+        {
+        'name':'l2',
+        'weight':1,
+        'mask':'mid5'},
+        {
+        'name':'edge',
+        'edge_type':'gradient',
+        'weight':10,
+        'mask':'norm',
+        'mask_before_operate':False,
+        'get_XY':True,
+        }],
+    'reg':None,
+    'Keep':0.8,
+    'Ob':'FULL_SEG_3C_motion',
+    'Gt':'FULL_SEG',
+    'kwargs' : {
+        "layers": 5,           # how many resolution levels we want to have
+        "conv_times": 2,       # how many times we want to convolve in each level
+        "features_root": 64,   # how many feature_maps we want to have as root (the following levels will calculate the feature_map by multiply by 2, exp, 64, 128, 256)
+        "filter_size": 3,      # filter size used in convolution
+        "pool_size": 2,        # pooling size used in max-pooling
+        "summaries": True,
+        "get_loss_dict": True,
+        "layers":3,
+        "batch_size": 5,
+        "valid_size": 5,
+        'n_classes':8
+    },
+    'proc_dict':{
+        'data':{},
+        'truth':{}        
+    },    
+    'epochs':220,
+    'optimizer': 'adam',
+    'server': '2',
+    'GPU_IND':'3'
+}
 
 # para_str_24 = 'Idx_24-Test'
 # para_dict_24 = {
@@ -637,8 +706,8 @@ para_dict_30 = {
 #     'GPU_IND':'2'
 # }
 
-para_dict_use = para_dict_30
-para_str_use = para_str_30
+para_dict_use = para_dict_31
+para_str_use = para_str_31
 
 # here indicating the GPU you want to use. if you don't have GPU, just leave it.
 gpu_ind = para_dict_use.get('GPU_IND', '3')
@@ -653,6 +722,8 @@ os.environ['CUDA_VISIBLE_DEVICES'] = gpu_ind # 0,1,2,3
 # gt_para = [para for para in parameter_parse if para.startswith('Gt')][0]
 # Input
 
+
+
 TEST_MODE = False
 if TEST_MODE:
     if ('3C' in para_dict_use['Ob']):
@@ -661,11 +732,16 @@ if TEST_MODE:
             if ('FULL_SEG' in para_dict_use['Ob']):            
                 # data = h5py_mat2npy('train_np/traOb_FULL_SEG_neigh_motion_part_1.mat')            
                 # data = h5py_mat2npy('../data/train_np/traOb_FULL_SEG_neigh_motion_part_1.mat')
-                # data_slice_idx_info = add_additional_info(None, assign_silce_idx(np.shape(data)[0]), 'slice_idx')
-                data = h5py_mat2npy('../data/valid_np/valOb_neigh_motion.mat')
-                data_slice_idx_info = add_additional_info(None, np.arange(100, 245+1, 5), 'slice_idx')                
+                # data_slice_idx_info = add_additional_info_dict_list(None, assign_silce_idx(np.shape(data)[0]), 'slice_idx')
+                # data = h5py_mat2npy('../data/valid_np/valOb_neigh_motion.mat')
+                data = h5py_mat2npy('../data/train_np/traOb_FULL_SEG_neigh_motion_part_3.mat')
+                data_cls = idx_classify(assign_silce_idx(np.shape(data)[0]), mode='equally')
+                #data_cls = idx_classify(np.arange(100, 245+1, 5), mode='equally_960')
+
+                
                 vdata = h5py_mat2npy('../data/valid_np/valOb_neigh_motion.mat')
-                vdata_slice_idx_info = add_additional_info(None, np.arange(100, 245+1, 5), 'slice_idx')                
+                # vdata_cls = idx_classify(assign_silce_idx(np.shape(vdata)[0]), mode='equally_960')
+                vdata_cls = idx_classify(np.arange(100, 245+1, 5), mode='equally_960')
 
     # Output
     if ('3C' in para_dict_use['Gt']):
@@ -675,9 +751,10 @@ if TEST_MODE:
         truth_channels = 1
         if ('FULL_SEG' in para_dict_use['Gt']):
             # truths = h5py_mat2npy('train_np/traGt_FULL_SEG_part_1.mat')            
-            # truths = h5py_mat2npy('../data/train_np/traGt_FULL_SEG_part_1.mat')
-            truths = h5py_mat2npy('../data/valid_np/valGt.mat')
+            truths = h5py_mat2npy('../data/train_np/traGt_FULL_SEG_part_3.mat')
+            # truths = h5py_mat2npy('../data/valid_np/valGt.mat')
             vtruths = h5py_mat2npy('../data/valid_np/valGt.mat')
+    training_iters = 100
 else:
     if ('3C' in para_dict_use['Ob']):
         data_channels = 3 
@@ -689,12 +766,16 @@ else:
                 data3 = h5py_mat2npy('../data/train_np/traOb_FULL_SEG_neigh_motion_part_3.mat')
                 data  = np.concatenate([data1, data2, data3], axis=0)    
                 #100:5:245
-                data_slice_idx_info = add_additional_info(None, assign_silce_idx(np.shape(data)[0]), 'slice_idx')
+                # data_slice_idx_info = add_additional_info_dict_list(None, assign_silce_idx(np.shape(data)[0]), 'slice_idx')
+                # data_slice_cls_info = add_additional_info_dict_list(None, idx_classify(assign_silce_idx(np.shape(data)[0]), mode='equally_960'), 'slice_cls')
+                data_cls = idx_classify(assign_silce_idx(np.shape(data)[0]), mode='equally')
                 del(data1, data2, data3)
                 vdata = h5py_mat2npy('../data/valid_np/valOb_neigh_motion.mat')
-                vdata_slice_idx_info = add_additional_info(None, np.arange(100, 245+1, 5), 'slice_idx')
+                #vdata_slice_idx_info = add_additional_info_dict_list(None, np.arange(100, 245+1, 5), 'slice_idx')
+                #vdata_slice_cls_info = add_additional_info_dict_list(None, idx_classify(np.arange(100, 245+1, 5), mode='equally_960'), 'slice_cls')
+                vdata_cls = idx_classify(np.arange(100, 245+1, 5), mode='equally_960')
 
-                
+    
 
     # Output
     if ('3C' in para_dict_use['Gt']):
@@ -710,10 +791,11 @@ else:
             truths  = np.concatenate([truths1, truths2, truths3], axis=0)
             del(truths1, truths2, truths3)                
             vtruths = h5py_mat2npy('../data/valid_np/valGt.mat')
+    training_iters = 700
         
 
-data_provider = image_util.SimpleDataProvider(data, truths, data_additional_info = data_slice_idx_info, process_dict = para_dict_use['proc_dict'])
-valid_provider = image_util.SimpleDataProvider(vdata, vtruths, data_additional_info = vdata_slice_idx_info, process_dict = para_dict_use['proc_dict'])
+data_provider = image_util.SimpleDataProvider(data, truths, data_cls = data_cls, data_cls_num=para_dict_use['kwargs']['n_classes'], process_dict = para_dict_use['proc_dict'], onehot_cls=True)
+valid_provider = image_util.SimpleDataProvider(vdata, vtruths, data_cls = vdata_cls, data_cls_num=para_dict_use['kwargs']['n_classes'], process_dict = para_dict_use['proc_dict'], onehot_cls=True)
 
 
 # -----------------------------------Loss------------------------------------------------------- #
@@ -758,8 +840,8 @@ net = Unet_bn(img_channels=data_channels, truth_channels=truth_channels, cost_di
 ####################################################
 
 # args for training
-batch_size = 5 # batch size for training
-valid_size = 5  # batch size for validating
+batch_size = kwargs.get("batch_size", 5) # batch size for training
+valid_size = kwargs.get("valid_size", 5)  # batch size for validating
 optimizer = "adam"  # optimizer we want to use, 'adam' or 'momentum'
 
 # # output paths for results
@@ -779,6 +861,6 @@ epochs=para_dict_use.get('epochs', 200)
 import time
 time_start= time.time()
 trainer = Trainer_bn(net, batch_size=batch_size, optimizer = para_dict_use.get('optimizer','adam'), opt_kwargs=opt_kwargs)
-path = trainer.train(data_provider, output_path, valid_provider, valid_size, dropout=para_dict_use['Keep'], training_iters=700, epochs=epochs, display_step=100, save_epoch=20, prediction_path=prediction_path)
+path = trainer.train(data_provider, output_path, valid_provider, valid_size, dropout=para_dict_use['Keep'], training_iters=training_iters, epochs=epochs, display_step=100, save_epoch=20, prediction_path=prediction_path)
 time_end = time.time()
 print(time_end - time_start)

@@ -12,8 +12,12 @@ import tensorflow.contrib as contrib
 from scadec import util
 from scadec.layers import *
 
+        # "get_loss_dict": True,
+        # "batch_size": 5,
+        # "valid_size": 5,
+        # 'n_classes':8
 
-def unet_decoder(x, keep_prob, phase, img_channels, truth_channels, layers=3, conv_times=3, features_root=16, filter_size=3, pool_size=2, summaries=True, get_loss_dict=False):
+def unet_decoder(x, keep_prob, phase, img_channels, truth_channels, layers=3, conv_times=3, features_root=16, filter_size=3, pool_size=2, summaries=True, get_loss_dict = True, batch_size = 5, valid_size = 5, n_classes = 8):
     """
     Creates a new convolutional unet for the given parametrization.
     
@@ -42,6 +46,8 @@ def unet_decoder(x, keep_prob, phase, img_channels, truth_channels, layers=3, co
     deconvs = OrderedDict()  # deconvolution layer
     dw_h_convs = OrderedDict()  # down-side convs
     up_h_convs = OrderedDict()  # up-side convs
+    # necks = OrderedDict()   # Necks for HydraNet- Xing
+    necks = []
 
     # conv the input image to desired feature maps
     in_node = conv2d_bn_relu(x_image, filter_size, features_root, keep_prob, phase, 'conv2feature_roots')
@@ -87,9 +93,26 @@ def unet_decoder(x, keep_prob, phase, img_channels, truth_channels, layers=3, co
     in_node = up_h_convs[0]
 
     # Output with residual
-    with tf.variable_scope("conv2d_1by1"):
-        output = conv2d(in_node, 1, truth_channels, keep_prob, 'conv2truth_channels')
-        up_h_convs["out"] = output    
+    # with tf.variable_scope("conv2d_1by1"):
+    #     output = conv2d(in_node, 1, truth_channels, keep_prob, 'conv2truth_channels')
+    #     up_h_convs["out"] = output
+
+    # Necks - Xing
+    with tf.variable_scope("necks_"):
+        for neck_idx in range(n_classes):
+            # print('Shape of in_node')
+            # print(in_node.shape)
+            # neck_1 = conv2d_bn_relu(in_node, 3, 5, keep_prob, phase, '{}_1'.format(neck_idx))
+            # print('Shape of neck1')
+            # print(neck_1.shape)
+            neck_2 = conv2d_bn_relu(in_node, 3, truth_channels, keep_prob, phase, '{}_2'.format(neck_idx))
+            print('Shape of neck2')
+            print(neck_2.shape)
+            neck_3 = conv2d(neck_2, 1, truth_channels, keep_prob, '{}_conv2truth_channels'.format(neck_idx))
+            print('Shape of neck3')
+            print(neck_3.shape)
+            # necks[neck_idx] = neck_3
+            necks.append(neck_3)
     
     if summaries:
         # for i, (c1, c2) in enumerate(convs):
@@ -109,7 +132,8 @@ def unet_decoder(x, keep_prob, phase, img_channels, truth_channels, layers=3, co
             tf.summary.histogram("up_convolution_%s"%k + '/activations', up_h_convs[k])
 
     # Xing
-    return output#, dw_h_convs, up_h_convs
+    # return output#, dw_h_convs, up_h_convs
+    return necks
 
 def get_image_summary(img, idx=0):
     """

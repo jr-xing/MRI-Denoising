@@ -30,18 +30,20 @@ class BaseDataProvider(object):
         self.a_min = a_min if a_min is not None else -np.inf
         self.a_max = a_max if a_min is not None else np.inf
     
-    def __call__(self, n, fix=False, rand_y = False):
+    def __call__(self, n, fix=False):
         if type(n) == int and not fix:
             # X and Y are the images and truths
-            train_data, truths, XInfo = self._next_batch(n, rand_y)
+            train_data, truths, batch_cls = self._next_batch(n)
         elif type(n) == int and fix:
-            train_data, truths, XInfo = self._fix_batch(n)
+            train_data, truths, batch_cls = self._fix_batch(n)
         elif type(n) == str and n == 'full':
-            train_data, truths, XInfo = self._full_batch() 
+            train_data, truths, batch_cls = self._full_batch() 
         else:
             raise ValueError("Invalid batch_size: "%n)
         
-        return train_data, truths, XInfo
+        # print('batch(called)')
+        # print(batch_cls)
+        return train_data, truths, batch_cls
 
     def _next_batch(self, n):
         pass
@@ -52,7 +54,7 @@ class BaseDataProvider(object):
 
 class SimpleDataProvider(BaseDataProvider):
     
-    def __init__(self, data, truths, data_additional_info = None, process_dict = {}):
+    def __init__(self, data, truths, data_cls = None, data_cls_num=None, onehot_cls = False, process_dict = {}):
         # additional_info should be list of dicts
         super(SimpleDataProvider, self).__init__()
         # Xing
@@ -65,39 +67,45 @@ class SimpleDataProvider(BaseDataProvider):
         self.file_count = data.shape[0]
         self.process_dict = process_dict
         
-        # Default as list of empty dict
-        if data_additional_info == None:
-            data_additional_info = [{}]*self.file_count
-
-        if len(data_additional_info) == self.file_count:
-            self.data_additional_info = data_additional_info
-            
+        # data_cls should be np.array
+        self.data_cls = data_cls.astype(np.int32)
+        if data_cls_num==None:
+            data_cls_num = len(np.unique(self.data_cls))
         else:
-            raise ValueError("Data size and additional_info size not match!")
+            self.data_cls_num = data_cls_num
+        
+        self.onehot_cls = onehot_cls
 
-    def _next_batch(self, n, rand_y):
+
+    def _next_batch(self, n):
         idx = np.random.choice(self.file_count, n, replace=False)
         img = self.data[idx[0]]
         nx = img.shape[0]
         ny = img.shape[1]
         X = np.zeros((n, nx, ny, self.img_channels))
         Y = np.zeros((n, nx, ny, self.truth_channels))
-        XInfo = [None]*n
+
+        if self.onehot_cls:
+            batch_cls = np.zeros([n, self.data_cls_num])
+            # print('batch_cls created')
+            # print(batch_cls)
+        else:
+            batch_cls = np.zeros(n)
 
         for i in range(n):
             X[i] = self._process_data(self.data[idx[i]])
             Y[i] = self._process_truths(self.truths[idx[i]])
-            XInfo[i] = self.data_additional_info[i]
-        if not rand_y:
-            return X, Y, XInfo
-        else:
-            # Added by Xing
-            # Offer additional random clear data as style target in computing perceptual loss
-            Yrand = np.zeros((n, nx, ny, self.truth_channels))
-            idx_rand = np.random.choice(self.file_count, n, replace=False)
-            for i in range(n):
-                Yrand[i] = self._process_truths(self.truths[idx_rand[i]])
-            return X, Y, Yrand
+            if self.onehot_cls:
+                batch_cls[i, self.data_cls[idx[i]]] = 1
+            else:    
+                batch_cls[i] = self.data_cls[idx[i]]
+        
+        # print('(In data Provider)')
+        # print('onehot_cls:')
+        # print(self.onehot_cls)
+        # print('np.shape(batch_cls)')
+        # print(np.shape(batch_cls))
+        return X, Y, batch_cls
 
     def _fix_batch(self, n):
         # first n data
@@ -106,12 +114,23 @@ class SimpleDataProvider(BaseDataProvider):
         ny = img.shape[1]
         X = np.zeros((n, nx, ny, self.img_channels))
         Y = np.zeros((n, nx, ny, self.truth_channels))
-        XInfo = [None]*n
+        
+        if self.onehot_cls:
+            batch_cls = np.zeros([n, self.data_cls_num])
+        else:
+            batch_cls = np.zeros(n)
+
         for i in range(n):
             X[i] = self._process_data(self.data[i])
             Y[i] = self._process_truths(self.truths[i])
-            XInfo[i] = self.data_additional_info[i]
-        return X, Y, XInfo
+            # print('self.data_cls[i]')
+            # print(type(self.data_cls[i]))
+            # print(self.data_cls[i])
+            if self.onehot_cls:
+                batch_cls[i, self.data_cls[i]] = 1
+            else:    
+                batch_cls[i] = self.data_cls[i]
+        return X, Y, batch_cls
 
     def _full_batch(self):
         return self._fix_batch(self.file_count)
@@ -171,4 +190,4 @@ def concat_n_images(image_mat):
             output = concat_images(output, img)
     return output
 
-
+    

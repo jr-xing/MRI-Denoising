@@ -29,9 +29,9 @@ import logging
 
 import tensorflow as tf
 
-from scadec import util
-from scadec.layers import *
-from scadec.nets import *
+from scadec_Hydra import util
+from scadec_Hydra.layers import *
+from scadec_Hydra.nets_Hydra import *
 
 sys.path.append(os.path.join(os.path.dirname(sys.path[0]), "./"))
 sys.path.append(os.path.join(os.path.dirname(sys.path[0]), "./scadec/"))
@@ -55,13 +55,14 @@ class Unet_bn(object):
     :param kwargs: args passed to create_net function. 
     """
    
-    def __init__(self, img_channels=3, truth_channels=3, cost_dict_list=[{'name':'l2'}], x_shape = None, y_shape = None, mouth_func = lambda x:-1,  **kwargs):
+    def __init__(self, img_channels=3, truth_channels=3, cost_dict_list=[{'name':'l2'}], x_shape = None, y_shape = None, **kwargs):
         tf.reset_default_graph()
 
         # basic variables
         self.summaries = kwargs.get("summaries", True)
         self.img_channels = img_channels
         self.truth_channels = truth_channels
+        self.batch_size = kwargs.get("batch_size", 5)
 
         # placeholders for input x and y
         if x_shape != None:
@@ -72,8 +73,6 @@ class Unet_bn(object):
             self.x = tf.placeholder("float", shape=[None, None, None, img_channels])
             self.y = tf.placeholder("float", shape=[None, None, None, truth_channels])
             # Added by Xing
-            # Offer additional random clear data as style target in computing perceptual loss
-            self.yRand = tf.placeholder("float", shape=[None, None, None, truth_channels])
         self.phase = tf.placeholder(tf.bool, name='phase')
         self.keep_prob = tf.placeholder(tf.float32, name='keep_prob') #dropout (keep probability)
         self.current_epoch = tf.placeholder(tf.int32, name='current_epoch')
@@ -90,15 +89,19 @@ class Unet_bn(object):
         # variables need to be calculated
         # self.recons = unet_decoder(self.x, self.keep_prob, self.phase, self.img_channels, self.truth_channels, **kwargs)
         # Xing
-        self.recons = unet_decoder(self.x, self.keep_prob, self.phase, self.img_channels, self.truth_channels, **kwargs)
+        self.necks = unet_decoder(self.x, self.keep_prob, self.phase, self.img_channels, self.truth_channels, **kwargs)
         # self.recons, self.dw_h_convs, _ = unet_decoder(self.x, self.keep_prob, self.phase, self.img_channels, self.truth_channels, **kwargs)
         # self.recons = tf.reshape(unet_decoder(self.x, self.keep_prob, self.phase, self.img_channels, self.truth_channels, **kwargs),[5,160,160,3])
         
         # Additional info
-        self.additional_info_str = tf.placeholder('string',[None])
-        self.mouth_func = mouth_func
+        # self.batch_cls = tf.placeholder(tf.int32,[None], name='batch_cls')
+        # one hot version
+        self.batch_cls = tf.placeholder(tf.int32,[None, kwargs['n_classes']], name='batch_cls')
+        #self.additional_info_str = tf.placeholder('string',[None])
+        #self.additional_info_dict_list = self.additional_info_str.eval()
+        # self.mouth_func = mouth_func
 
-        # Xing
+        # Xing        
         self.loss_dict = self._get_cost(cost_dict_list)
         self.loss = self.loss_dict['total_loss']
         self.valid_loss_dict = self._get_cost(cost_dict_list)
@@ -167,81 +170,7 @@ class Unet_bn(object):
                 normXX, normYY = np.meshgrid(normX, normY)
                 maskN = norm.pdf(np.abs(normXX)+np.abs(normYY))
                 maskN = (maskN-np.min(maskN))/np.max(maskN)
-                return np.float32(np.reshape(maskN,[w,h,1]))
-        
-        # def apply_mask(img, mode):
-        #     # if mode == None:
-        #     #     return img
-        #     img_shape = img.get_shape().as_list()
-        #     #h, w = img_shape[1:3]
-        #     #mask = get_mask(img, mode, 320, 320)
-        #     mask = np.float32(np.ones([320, 320, 1]))
-        #     print(np.shape(mask))
-        #     return tf.multiply(img, mask)
-
-            
-        # def get_mask_tf(img = None, mode = 'default'):
-        #     # https://stackoverflow.com/questions/39157723/how-to-do-slice-assignment-in-tensorflow
-        #     # p1 = tf.placeholder(tf.float32, [None,5,5,3])
-        #     # mr1 = tf.Variable(tf.ones([5,5,1]), trainable = False)
-        #     # mr2 = mr1[:3,:3,:].assign(tf.ones([3,3,1])*5)
-        #     # init = tf.global_variables_initializer()
-        #     # with tf.Session() as sess:
-        #     #     sess.run(init)
-        #     #     print('VALUE:')
-        #     #     print(sess.run(mr1))
-                
-        #     # Get image shape            
-        #     img_shape = img.get_shape().as_list()
-        #     h = img_shape[1]        
-        #     w = img_shape[2]
-
-        #     # Generate mask
-        #     if mode == None:
-        #         mask = tf.ones([w, h, 1])
-        #     elif mode == 'default':
-        #         mask = tf.ones([w, h, 1]) * 0.5
-        #         mask = mask[:,int(w/3):int(2*w/3),:].assign(tf.ones([h,int(2*w/3)-int(w/3),1])*1)
-        #         mask = mask[:,int(w/3):int(2*w/3),:].assign(tf.ones([int(2*h/3)-int(h/3),int(2*w/3)-int(w/3),1])*1.5)
-        #         return mask
-        #     elif mode == 'mid5':
-        #         mask = tf.ones([w, h, 1]) * 0.1
-        #         mask = mask[:,int(1*w/5):int(4*w/5),:].assign(tf.ones([h,int(4*w/5)-int(1*w/5),1])*0.5)
-        #         mask = mask[:,int(2*w/5):int(3*w/5),:].assign(tf.ones([h,int(3*w/5)-int(2*w/5),1])*1.5)
-        #         return mask
-        #     elif mode == 'norm':
-        #         from scipy.stats import norm
-        #         scaleX = 1.2
-        #         scaleY = 0.8
-        #         normX = np.linspace(norm.ppf(0.001, scale=scaleX),norm.ppf(0.999,scale=scaleX), w)
-        #         normY = np.linspace(norm.ppf(0.001, scale=scaleY),norm.ppf(0.999,scale=scaleY), h)
-        #         normXX, normYY = np.meshgrid(normX, normY)
-        #         maskN = norm.pdf(np.abs(normXX)+np.abs(normYY))
-        #         maskN = (maskN-np.min(maskN))/np.max(maskN)
-        #         # return np.float32(maskN)
-        #         return tf.constant(maskN)
-        
-        # def get_grad_old(img):
-        #     dify = img[:,  1:, :-1,:] - img[:,:-1,:-1,:]
-        #     difx = img[:, :-1, 1:, :] - img[:,:-1,:-1,:]
-        #     return dify+difx
-
-        # def get_grad(img):
-        #     difX = tf.reshape(tf.constant([[1,0,-1],[1,0,-1],[1,0,-1]],tf.float32),[3, 3, 1, 1])
-        #     difY = tf.reshape(tf.constant([[1,2,1],[0,0,0],[-1,-2,-1]],tf.float32),[3, 3, 1, 1])
-        #     gradX = tf.nn.conv2d(img, sobelX, strides=[1,1,1,1], padding='SAME')[:,1:-1,1:-1,:]
-        #     gradY = tf.nn.conv2d(img, sobelY, strides=[1,1,1,1], padding='SAME')[:,1:-1,1:-1,:]
-        #     dify = img[:,  1:, :-1,:] - img[:,:-1,:-1,:]
-        #     difx = img[:, :-1, 1:, :] - img[:,:-1,:-1,:]
-        #     return tf.sqrt(tf.square(difx)+tf.square(dify))
-                
-        
-        # def get_Sobel(img):
-        #     sobelX = tf.reshape(tf.constant([[1,0,-1],[2,0,-2],[1,0,-1]],tf.float32),[3, 3, 1, 1])
-        #     sobelY = tf.reshape(tf.constant([[1,2,1],[0,0,0],[-1,-2,-1]],tf.float32),[3, 3, 1, 1])
-        #     imgX = tf.nn.conv2d(img, sobelX, strides=[1,1,1,1], padding='SAME')[:,1:-1,1:-1,:]
-        #     imgY = tf.nn.conv2d(img, sobelY, strides=[1,1,1,1], padding='SAME')[:,1:-1,1:-1,:]
-        #     return tf.sqrt(tf.square(imgX)+tf.square(imgY))
+                return np.float32(np.reshape(maskN,[w,h,1]))        
 
         def get_edge(img, operator, get_XY = False):
             # https://blog.csdn.net/huanghuangjin/article/details/81130171
@@ -274,30 +203,6 @@ class Unet_bn(object):
             else:
                 raise ValueError("Unknown edge type: "+operator)
 
-        # def check_if_valid(loss_dict):
-        #     # valid_after_epoch, valid_from_end
-        #     # invalid_after_epoch, invalid_from_end
-        #     # Get claimed valid range
-        #     valid_idx_start_1 = loss_dict.get('valid_after_epoch', 0)
-        #     valid_idx_start_2 = self.total_epochs - loss_dict.get('valid_from_end', self.total_epochs)
-        #     valid_idx_start = tf.math.maximum(valid_idx_start_1, valid_idx_start_2)
-        #     # valid_range_temp1 = list(range(valid_idx_start, self.total_epochs))
-
-        #     # Get claimed invalid range
-        #     invalid_idx_start_1 = loss_dict.get('invalid_after_epoch', 0)
-        #     invalid_idx_start_2 = self.total_epochs - loss_dict.get('invalid_from_end', self.total_epochs)
-        #     invalid_idx_start = tf.math.maximum(invalid_idx_start_1, invalid_idx_start_2)
-
-        #     # intersect = lambda l1, l2: list(set(l1) & set(l2)) 
-
-        #     # full_range = list(range(self.total_epochs))            
-        #     # invalid_range = list(range(invalid_idx_start, self.total_epochs))
-        #     # valid_range_temp2 = [epoch_idx for epoch_idx in full_range if epoch_idx not in invalid_range]
-
-        #     # valid_range = intersect(valid_range_temp1, valid_range_temp2)
-        #     # return self.current_epoch in valid_range
-        #     # return tf.math.greater(self.current_epoch, valid_idx_start) and tf.math.less(self.current_epoch, invalid_idx_start)
-        #     return tf.logical_and(tf.math.greater(self.current_epoch, valid_idx_start), tf.math.less(self.current_epoch, invalid_idx_start))
         
         def get_losses(x, y, cost_dict_list):
             loss = 0
@@ -357,9 +262,9 @@ class Unet_bn(object):
             loss_dict['total_loss'] = loss
             return loss_dict
         
-        def head(img):
-            # global sliceIdx
-            return img
+        # def head(img):
+        #     # global sliceIdx
+        #     return img
         
         # Hydra
         # batch_size = tf.shape(self.x)[0]
@@ -371,11 +276,72 @@ class Unet_bn(object):
                 total_loss_dict[cost_dict['edge_type']]=0
             else:
                 total_loss_dict[cost_dict['name']] = 0
+        
+        self.recons = None
 
-        for img_idx in range(5):
-            # Pass through 
-            recon = head(tf.reshape(self.recons[img_idx,:,:,:],[1,320,320,self.truth_channels]))
-            y = head(tf.reshape(self.y[img_idx,:,:,:],[1,320,320,self.truth_channels]))
+        for img_idx in range(self.batch_size):
+            # cls_0 = lambda: 0
+            # cls_1 = lambda: 1
+            # cls_2 = lambda: 2
+            # cls_3 = lambda: 3
+            # cls_4 = lambda: 4
+            # cls_5 = lambda: 5
+            # cls_6 = lambda: 6
+            # cls_7 = lambda: 7
+
+            # img_class = tf.case({
+            #     tf.equal(self.batch_cls[img_idx][0], tf.constant(0)): cls_0,
+            #     tf.equal(self.batch_cls[img_idx][0], tf.constant(1)): cls_1,
+            #     tf.equal(self.batch_cls[img_idx][0], tf.constant(2)): cls_2,
+            #     tf.equal(self.batch_cls[img_idx][0], tf.constant(3)): cls_3,
+            #     tf.equal(self.batch_cls[img_idx][0], tf.constant(4)): cls_4,
+            #     tf.equal(self.batch_cls[img_idx][0], tf.constant(5)): cls_5,
+            #     tf.equal(self.batch_cls[img_idx][0], tf.constant(6)): cls_6,
+            #     tf.equal(self.batch_cls[img_idx][0], tf.constant(7)): cls_7,
+            # })
+
+            # Get recon
+            # recon = 0
+            # for neckIdx, neck in enmuerate(self.necks):
+            #     recon += neck*tf.cond(tf.equal(self.batch_cls[img_idx]))
+
+            # Ways to slice self.necks
+            # 1. get_variable
+
+            # img_class = self.batch_cls[img_idx]
+            # print('SHape of batch_cls!')
+            # print(self.batch_cls.shape)
+            # img_class = tf.slice(self.batch_cls, [img_idx], [1], name = 'get_image_cls')
+            # recon = self.necks[img_class]
+            # img_class = tf.gather(self.batch_cls, img_idx)[0]
+            # img_class = self.batch_cls[img_idx]
+            img_class_onehot = self.batch_cls[img_idx, :]
+            # recon = tf.nn.embedding_lookup()
+            # recon = tf.slice(self.necks)
+            # print('Neck')
+            # print(self.necks[0].shape)
+            # print('Shape after dynamic partition')
+            # print(tf.dynamic_partition(self.necks, img_class_onehot, 2, name = 'part_necks')[0][img_idx,:,:,:].shape)
+            recon = tf.reshape(tf.dynamic_partition(self.necks, img_class_onehot, 2, name = 'part_necks')[0][0][img_idx,:,:,:],[1,320,320,self.truth_channels], name = 'reshape_recon')
+            # recon = tf.reshape(tf.gather(self.necks, img_class, name = 'gather_neck')[img_idx,:,:,:],[1,320,320,self.truth_channels])
+            # recon = tf.reshape(self.necks[0][img_idx,:,:,:],[1,320,320,self.truth_channels])
+
+            # partitions = []
+            # recon = tf.reshape(tf.dynamic_partition(self.necks, img_class)[0],[1,320,320,self.truth_channels])
+
+            if self.recons == None:
+                self.recons = recon
+            else:
+                self.recons = tf.concat([self.recons, recon],axis=0)
+                print('Current recons:')
+                print(self.recons.shape)
+
+            # recon = tf.get_tensor_by_name('necks_'+ str(self.batch_cls[img_idx]) + '_conv2truth_channels')
+            # recon = tf.slice(self.necks, img_class, 1)
+            y = tf.reshape(self.y[img_idx,:,:,:],[1,320,320,self.truth_channels])
+
+            #recon = head(tf.reshape(self.recons[img_idx,:,:,:],[1,320,320,self.truth_channels]))
+            # y = head(tf.reshape(self.y[img_idx,:,:,:],[1,320,320,self.truth_channels]))
 
             # Compute Losses for this single img in batch
             loss_dict = get_losses(recon, y, cost_dict_list)

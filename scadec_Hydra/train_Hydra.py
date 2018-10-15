@@ -184,7 +184,7 @@ class Trainer_bn(object):
             logging.info("Start optimization")
 
             # select validation dataset
-            valid_x, valid_y, valid_additional_info = valid_provider(valid_size, fix=True)
+            valid_x, valid_y, vbatch_cls = valid_provider(valid_size, fix=True)
             if SAVE_MODE == 'Original':
                 util.save_mat(valid_y, "%s/%s.mat"%(self.prediction_path, 'origin_y'))
                 util.save_mat(valid_x, "%s/%s.mat"%(self.prediction_path, 'origin_x'))
@@ -199,12 +199,11 @@ class Trainer_bn(object):
                 total_loss = 0
                 # batch_x, batch_y = data_provider(self.batch_size)
                 for step in range((epoch*training_iters), ((epoch+1)*training_iters)):
-                    if not Y_RAND:
-                        batch_x, batch_y, additional_info_x = data_provider(self.batch_size)                        
-                        additional_info_str_x = [str(info) for info in additional_info_x]
-                        batch_y_rand = batch_y
-                    else:
-                        batch_x, batch_y, batch_y_rand = data_provider(self.batch_size, rand_y = True)
+                    # print('data_provider.onehot_cls')
+                    # print(data_provider.onehot_cls)
+                    batch_x, batch_y, batch_cls = data_provider(self.batch_size)
+                    # print('Shape of batch_cls!')
+                    # print(np.shape(batch_cls))
                     # Run optimization op (backprop)
                 
                     _, loss_dict, lr, avg_psnr, train_output = sess.run([self.optimizer,
@@ -214,10 +213,9 @@ class Trainer_bn(object):
                                                         self.net.recons], 
                                                         feed_dict={self.net.x: batch_x,
                                                                     self.net.y: batch_y,
-                                                                    self.net.additional_info_str: additional_info_str_x,
+                                                                    self.net.batch_cls: batch_cls,
                                                                     self.net.current_epoch: epoch,
                                                                     self.net.total_epochs: epochs,
-                                                                    self.net.yRand: batch_y_rand,
                                                                     self.net.keep_prob: dropout,
                                                                     self.net.phase: True})
                     loss = loss_dict['total_loss']                    
@@ -226,7 +224,7 @@ class Trainer_bn(object):
                         # Changed here - Xing
                         # logging.info("Iter {:}".format(step))
                         logging.info("Iter {:} (before training on the batch) Minibatch MSE= {:.4f}, Minibatch Avg PSNR= {:.4f}".format(step, loss, avg_psnr))
-                        self.output_minibatch_stats(sess, summary_writer, step, batch_x, batch_y, epoch)
+                        self.output_minibatch_stats(sess, summary_writer, step, batch_x, batch_y, batch_cls, epoch)
                         
                     total_loss += loss
 
@@ -238,14 +236,14 @@ class Trainer_bn(object):
 
                 # output statistics for epoch
                 self.output_epoch_stats(epoch, total_loss, training_iters, lr)
-                self.output_valstats(sess, summary_writer, step, valid_x, valid_y, "epoch_%s_valid"%epoch, epoch, store_img=True)
+                self.output_valstats(sess, summary_writer, step, valid_x, valid_y, vbatch_cls, "epoch_%s_valid"%epoch, epoch, store_img=True)
                 # Xing
                 if SAVE_TRAIN_PRED:
                     if SAVE_MODE == 'Original':
                         util.save_img(train_output[0,...], "%s/%s_img.tif"%(self.prediction_path, "epoch_%s_train"%epoch))
                     elif SAVE_MODE == 'Xiaojian':
                         # Xiaojian's code
-                        self.output_train_batch_stats(sess, epoch, batch_x, batch_y, epoch)
+                        self.output_train_batch_stats(sess, epoch, batch_x, batch_y, batch_cls, epoch)
                         # train_inputs = util.concat_n_images(batch_x)
                         # train_outputs = util.concat_n_images(train_output)
                         # train_targets = util.concat_n_images(batch_y)
@@ -274,13 +272,14 @@ class Trainer_bn(object):
             logging.info("Epoch {:}, Average MSE: {:.4f}, learning rate: {:.4f}".format(epoch, (total_loss / training_iters), lr))
         
     
-    def output_minibatch_stats(self, sess, summary_writer, step, batch_x, batch_y, current_epoch):
+    def output_minibatch_stats(self, sess, summary_writer, step, batch_x, batch_y, batch_cls, current_epoch):
         # Calculate batch loss and accuracy
         loss, predictions, avg_psnr = sess.run([self.net.loss,  
                                                 self.net.recons,
                                                 self.net.avg_psnr], 
                                                 feed_dict={self.net.x: batch_x,
                                                             self.net.y: batch_y,
+                                                            self.net.batch_cls: batch_cls,
                                                             self.net.current_epoch: current_epoch,
                                                             self.net.total_epochs: self.total_epochs,
                                                             self.net.keep_prob: 1.,
@@ -295,7 +294,7 @@ class Trainer_bn(object):
         else:
             logging.info("Iter {:} (After training on the batch) Minibatch MSE= {:.4f}, Minibatch Avg PSNR= {:.4f}".format(step,loss,avg_psnr))
 
-    def output_train_batch_stats(self, sess, epoch, batch_x, batch_y, current_epoch):
+    def output_train_batch_stats(self, sess, epoch, batch_x, batch_y, batch_cls, current_epoch):
         # Xing
         # Calculate batch loss and accuracy
         loss, predictions, avg_psnr = sess.run([self.net.loss,  
@@ -303,6 +302,7 @@ class Trainer_bn(object):
                                                 self.net.avg_psnr], 
                                                 feed_dict={self.net.x: batch_x,
                                                             self.net.y: batch_y,
+                                                            self.net.batch_cls: batch_cls,
                                                             self.net.current_epoch: current_epoch,
                                                             self.net.total_epochs: self.total_epochs,
                                                             self.net.keep_prob: 1.,
@@ -314,13 +314,14 @@ class Trainer_bn(object):
         util.save_img(train_outputs, "%s/%s_img.tif"%(self.prediction_path, "epoch_%s_train_outputs"%epoch))
         util.save_img(train_targets, "%s/%s_img.tif"%(self.prediction_path, "epoch_%s_train_targets"%epoch))
 
-    def output_valstats(self, sess, summary_writer, step, batch_x, batch_y, name, current_epoch, store_img=True):
+    def output_valstats(self, sess, summary_writer, step, batch_x, batch_y, batch_cls, name, current_epoch, store_img=True):
         
         prediction, loss_dict, avg_psnr = sess.run([self.net.recons,
                                                 self.net.valid_loss_dict,
                                                 self.net.valid_avg_psnr], 
                                                 feed_dict={self.net.x: batch_x, 
                                                             self.net.y: batch_y,
+                                                            self.net.batch_cls: batch_cls,
                                                             self.net.current_epoch: current_epoch,
                                                             self.net.total_epochs: self.total_epochs,
                                                             self.net.keep_prob: 1.,
