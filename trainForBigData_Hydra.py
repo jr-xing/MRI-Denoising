@@ -527,6 +527,86 @@ para_dict_28 = {
     'GPU_IND':'3'
 }
 
+para_str_29 = 'Idx_29-Loss_l2_masked_mid5-Loss-gradient_XY_masked_norm-Reg_no-Drop_0.7-Ob_FULL_SEG_3C_motion-Gt_FULL_SEG'
+para_dict_29 = {
+    'idx':29,
+    'losses':[
+        {
+        'name':'l2',
+        'weight':1,
+        'mask':'mid5'},
+        {
+        'name':'edge',
+        'edge_type':'gradient',
+        'weight':10,
+        'mask':'norm',
+        'mask_before_operate':False,
+        'get_XY':True,
+        }],
+    'reg':None,
+    'Keep':0.7,
+    'Ob':'FULL_SEG_3C_motion',
+    'Gt':'FULL_SEG',
+    'kwargs' : {
+        "layers": 5,           # how many resolution levels we want to have
+        "conv_times": 2,       # how many times we want to convolve in each level
+        "features_root": 64,   # how many feature_maps we want to have as root (the following levels will calculate the feature_map by multiply by 2, exp, 64, 128, 256)
+        "filter_size": 3,      # filter size used in convolution
+        "pool_size": 2,        # pooling size used in max-pooling
+        "summaries": True,
+        "get_loss_dict": True
+    },
+    'proc_dict':{
+        'data':{},
+        'truth':{}        
+    },
+    'epochs':200,
+    'optimizer': 'adam',
+    'server': '1',
+    'GPU_IND':'2'
+}
+
+para_str_30 = 'Idx_30-Loss_l2_masked_mid5-Loss-gradient_XY_masked_norm_invalid_end20-Reg_no-Drop_0.8-Ob_FULL_SEG_3C_motion-Gt_FULL_SEG-Proc_ero_4'
+para_dict_30 = {
+    'idx':30,
+    'losses':[
+        {
+        'name':'l2',
+        'weight':1,
+        'mask':'mid5'},
+        {
+        'name':'edge',
+        'edge_type':'gradient',
+        'weight':10,
+        'mask':'norm',
+        'mask_before_operate':False,
+        'get_XY':True,
+        }],
+    'reg':None,
+    'Keep':0.8,
+    'Ob':'FULL_SEG_3C_motion',
+    'Gt':'FULL_SEG',
+    'kwargs' : {
+        "layers": 5,           # how many resolution levels we want to have
+        "conv_times": 2,       # how many times we want to convolve in each level
+        "features_root": 64,   # how many feature_maps we want to have as root (the following levels will calculate the feature_map by multiply by 2, exp, 64, 128, 256)
+        "filter_size": 3,      # filter size used in convolution
+        "pool_size": 2,        # pooling size used in max-pooling
+        "summaries": True,
+        "get_loss_dict": True
+    },
+    'proc_dict':{
+        'data':{'erosion':{'size':(4,4)}},
+        'truth':{}        
+    },
+    'epochs':220,
+    'optimizer': 'adam',
+    'server': '1',
+    'GPU_IND':'3'
+}
+
+
+
 # para_str_24 = 'Idx_24-Test'
 # para_dict_24 = {
 #     'idx':24,
@@ -557,8 +637,8 @@ para_dict_28 = {
 #     'GPU_IND':'2'
 # }
 
-para_dict_use = para_dict_28
-para_str_use = para_str_28
+para_dict_use = para_dict_29
+para_str_use = para_str_29
 
 # here indicating the GPU you want to use. if you don't have GPU, just leave it.
 gpu_ind = para_dict_use.get('GPU_IND', '3')
@@ -695,7 +775,7 @@ opt_kwargs = {
 
 # # make a trainer for scadec
 # # epochs=600
-epochs=200
+epochs=para_dict_use.get('epochs', 200)
 import time
 time_start= time.time()
 trainer = Trainer_bn(net, batch_size=batch_size, optimizer = para_dict_use.get('optimizer','adam'), opt_kwargs=opt_kwargs)

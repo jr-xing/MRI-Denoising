@@ -214,6 +214,8 @@ class Trainer_bn(object):
                                                         feed_dict={self.net.x: batch_x,
                                                                     self.net.y: batch_y,
                                                                     self.net.additional_info_str: additional_info_str_x,
+                                                                    self.net.current_epoch: epoch,
+                                                                    self.net.total_epochs: epochs,
                                                                     self.net.yRand: batch_y_rand,
                                                                     self.net.keep_prob: dropout,
                                                                     self.net.phase: True})

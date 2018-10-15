@@ -76,6 +76,8 @@ class Unet_bn(object):
             self.yRand = tf.placeholder("float", shape=[None, None, None, truth_channels])
         self.phase = tf.placeholder(tf.bool, name='phase')
         self.keep_prob = tf.placeholder(tf.float32) #dropout (keep probability)
+        self.current_epoch = tf.placeholder(tf.uint8)
+        self.total_epochs = tf.placeholder(tf.uint8)
 
 
         # reused variables
@@ -272,20 +274,41 @@ class Unet_bn(object):
             else:
                 raise ValueError("Unknown edge type: "+operator)
 
+        def check_if_valid(loss_dict):
+            # valid_after_epoch, valid_from_end
+            # invalid_after_epoch, invalid_from_end
+            # Get claimed valid range
+            valid_idx_start_1 = loss_dict.get('valid_after_epoch', 0)
+            valid_idx_start_2 = self.total_epochs - loss_dict.get('valid_from_end', self.total_epochs)
+            valid_idx_start = max(valid_idx_start_1, valid_idx_start_2)
+            valid_range_temp1 = list(range(valid_idx_start, self.total_epochs))
+
+            # Get claimed invalid range
+            invalid_idx_start_1 = loss_dict.get('invalid_after_epoch', 0)
+            invalid_idx_start_2 = self.total_epochs - loss_dict.get('invalid_from_end', self.total_epochs)
+            invalid_idx_start = max(invalid_idx_start_1, invalid_idx_start_2)
+
+            intersect = lambda l1, l2: list(set(l1) & set(l2)) 
+
+            full_range = list(range(self.total_epochs))            
+            invalid_range = list(range(invalid_idx_start, self.total_epochs))
+            valid_range_temp2 = [epoch_idx for epoch_idx in full_range if epoch_idx not in invalid_range]
+
+            valid_range = intersect(valid_range_temp1, valid_range_temp2)
+            return self.current_epoch in valid_range
+        
         def get_losses(x, y, cost_dict_list):
             loss = 0
             loss_dict = {}
             for cost_dict in cost_dict_list:
+                if not check_if_valid(cost_dict):
+                    continue
+
                 if cost_dict['name'] == 'l2' or cost_dict['name'] == 'mean_square_error':                
-                    # x_masked = apply_mask(x, cost_dict.get('mask',None))
-                    # y_masked = apply_mask(y, cost_dict.get('mask',None))
                     mask = get_mask(mode=cost_dict.get('mask',None),h=320,w=320)
                     loss_l2 = tf.losses.mean_squared_error(tf.multiply(x,mask), tf.multiply(y,mask))
-                    # loss_l2 = tf.losses.mean_squared_error(x_masked, y_masked)
                     current_loss = loss_l2
                     current_loss_name = cost_dict['name']
-                    #loss += cost_dict['weight']*loss_l2
-                    #loss_dict['meaｎ_square_loss'] = loss_l2
 
                 elif cost_dict['name'] == 'edge':
                     mask = get_mask(mode=cost_dict.get('mask',None),h=320,w=320)
@@ -349,15 +372,8 @@ class Unet_bn(object):
 
         for img_idx in range(5):
             # Pass through 
-            # self.img_channels = img_channels
-            # self.truth_channels = truth_channels
             recon = head(tf.reshape(self.recons[img_idx,:,:,:],[1,320,320,self.truth_channels]))
-            # print(img_idx)
-            # print('recon: ')
-            # print(recon.get_shape().as_list())
             y = head(tf.reshape(self.y[img_idx,:,:,:],[1,320,320,self.truth_channels]))
-            # print('y: ')
-            # print(y.get_shape().as_list())
 
             # Compute Losses for this single img in batch
             loss_dict = get_losses(recon, y, cost_dict_list)
