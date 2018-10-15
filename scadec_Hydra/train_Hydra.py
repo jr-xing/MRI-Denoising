@@ -157,6 +157,7 @@ class Trainer_bn(object):
         
         # initialize the training process.
         init = self._initialize(training_iters, output_path, restore, prediction_path)
+        self.total_epochs = epochs
 
         # create output path
         directory = os.path.join(output_path, "final/")
@@ -225,7 +226,7 @@ class Trainer_bn(object):
                         # Changed here - Xing
                         # logging.info("Iter {:}".format(step))
                         logging.info("Iter {:} (before training on the batch) Minibatch MSE= {:.4f}, Minibatch Avg PSNR= {:.4f}".format(step, loss, avg_psnr))
-                        self.output_minibatch_stats(sess, summary_writer, step, batch_x, batch_y)
+                        self.output_minibatch_stats(sess, summary_writer, step, batch_x, batch_y, epoch)
                         
                     total_loss += loss
 
@@ -237,14 +238,14 @@ class Trainer_bn(object):
 
                 # output statistics for epoch
                 self.output_epoch_stats(epoch, total_loss, training_iters, lr)
-                self.output_valstats(sess, summary_writer, step, valid_x, valid_y, "epoch_%s_valid"%epoch, store_img=True)
+                self.output_valstats(sess, summary_writer, step, valid_x, valid_y, "epoch_%s_valid"%epoch, epoch, store_img=True)
                 # Xing
                 if SAVE_TRAIN_PRED:
                     if SAVE_MODE == 'Original':
                         util.save_img(train_output[0,...], "%s/%s_img.tif"%(self.prediction_path, "epoch_%s_train"%epoch))
                     elif SAVE_MODE == 'Xiaojian':
                         # Xiaojian's code
-                        self.output_train_batch_stats(sess, epoch, batch_x, batch_y)
+                        self.output_train_batch_stats(sess, epoch, batch_x, batch_y, epoch)
                         # train_inputs = util.concat_n_images(batch_x)
                         # train_outputs = util.concat_n_images(train_output)
                         # train_targets = util.concat_n_images(batch_y)
@@ -273,13 +274,15 @@ class Trainer_bn(object):
             logging.info("Epoch {:}, Average MSE: {:.4f}, learning rate: {:.4f}".format(epoch, (total_loss / training_iters), lr))
         
     
-    def output_minibatch_stats(self, sess, summary_writer, step, batch_x, batch_y):
+    def output_minibatch_stats(self, sess, summary_writer, step, batch_x, batch_y, current_epoch):
         # Calculate batch loss and accuracy
         loss, predictions, avg_psnr = sess.run([self.net.loss,  
                                                 self.net.recons,
                                                 self.net.avg_psnr], 
                                                 feed_dict={self.net.x: batch_x,
                                                             self.net.y: batch_y,
+                                                            self.net.current_epoch: current_epoch,
+                                                            self.net.total_epochs: self.total_epochs,
                                                             self.net.keep_prob: 1.,
                                                             self.net.phase: False})
 
@@ -292,7 +295,7 @@ class Trainer_bn(object):
         else:
             logging.info("Iter {:} (After training on the batch) Minibatch MSE= {:.4f}, Minibatch Avg PSNR= {:.4f}".format(step,loss,avg_psnr))
 
-    def output_train_batch_stats(self, sess, epoch, batch_x, batch_y):
+    def output_train_batch_stats(self, sess, epoch, batch_x, batch_y, current_epoch):
         # Xing
         # Calculate batch loss and accuracy
         loss, predictions, avg_psnr = sess.run([self.net.loss,  
@@ -300,6 +303,8 @@ class Trainer_bn(object):
                                                 self.net.avg_psnr], 
                                                 feed_dict={self.net.x: batch_x,
                                                             self.net.y: batch_y,
+                                                            self.net.current_epoch: current_epoch,
+                                                            self.net.total_epochs: self.total_epochs,
                                                             self.net.keep_prob: 1.,
                                                             self.net.phase: False})
         train_inputs = util.concat_n_images(batch_x)
@@ -309,13 +314,15 @@ class Trainer_bn(object):
         util.save_img(train_outputs, "%s/%s_img.tif"%(self.prediction_path, "epoch_%s_train_outputs"%epoch))
         util.save_img(train_targets, "%s/%s_img.tif"%(self.prediction_path, "epoch_%s_train_targets"%epoch))
 
-    def output_valstats(self, sess, summary_writer, step, batch_x, batch_y, name, store_img=True):
+    def output_valstats(self, sess, summary_writer, step, batch_x, batch_y, name, current_epoch, store_img=True):
         
         prediction, loss_dict, avg_psnr = sess.run([self.net.recons,
                                                 self.net.valid_loss_dict,
                                                 self.net.valid_avg_psnr], 
                                                 feed_dict={self.net.x: batch_x, 
                                                             self.net.y: batch_y,
+                                                            self.net.current_epoch: current_epoch,
+                                                            self.net.total_epochs: self.total_epochs,
                                                             self.net.keep_prob: 1.,
                                                             self.net.phase: False})
         loss = loss_dict['total_loss']

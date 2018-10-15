@@ -637,8 +637,8 @@ para_dict_30 = {
 #     'GPU_IND':'2'
 # }
 
-para_dict_use = para_dict_29
-para_str_use = para_str_29
+para_dict_use = para_dict_30
+para_str_use = para_str_30
 
 # here indicating the GPU you want to use. if you don't have GPU, just leave it.
 gpu_ind = para_dict_use.get('GPU_IND', '3')

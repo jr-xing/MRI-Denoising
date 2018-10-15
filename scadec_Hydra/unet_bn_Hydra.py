@@ -75,9 +75,9 @@ class Unet_bn(object):
             # Offer additional random clear data as style target in computing perceptual loss
             self.yRand = tf.placeholder("float", shape=[None, None, None, truth_channels])
         self.phase = tf.placeholder(tf.bool, name='phase')
-        self.keep_prob = tf.placeholder(tf.float32) #dropout (keep probability)
-        self.current_epoch = tf.placeholder(tf.uint8)
-        self.total_epochs = tf.placeholder(tf.uint8)
+        self.keep_prob = tf.placeholder(tf.float32, name='keep_prob') #dropout (keep probability)
+        self.current_epoch = tf.placeholder(tf.int32, name='current_epoch')
+        self.total_epochs = tf.placeholder(tf.int32, name='total_epochs')
 
 
         # reused variables
@@ -274,35 +274,35 @@ class Unet_bn(object):
             else:
                 raise ValueError("Unknown edge type: "+operator)
 
-        def check_if_valid(loss_dict):
-            # valid_after_epoch, valid_from_end
-            # invalid_after_epoch, invalid_from_end
-            # Get claimed valid range
-            valid_idx_start_1 = loss_dict.get('valid_after_epoch', 0)
-            valid_idx_start_2 = self.total_epochs - loss_dict.get('valid_from_end', self.total_epochs)
-            valid_idx_start = max(valid_idx_start_1, valid_idx_start_2)
-            valid_range_temp1 = list(range(valid_idx_start, self.total_epochs))
+        # def check_if_valid(loss_dict):
+        #     # valid_after_epoch, valid_from_end
+        #     # invalid_after_epoch, invalid_from_end
+        #     # Get claimed valid range
+        #     valid_idx_start_1 = loss_dict.get('valid_after_epoch', 0)
+        #     valid_idx_start_2 = self.total_epochs - loss_dict.get('valid_from_end', self.total_epochs)
+        #     valid_idx_start = tf.math.maximum(valid_idx_start_1, valid_idx_start_2)
+        #     # valid_range_temp1 = list(range(valid_idx_start, self.total_epochs))
 
-            # Get claimed invalid range
-            invalid_idx_start_1 = loss_dict.get('invalid_after_epoch', 0)
-            invalid_idx_start_2 = self.total_epochs - loss_dict.get('invalid_from_end', self.total_epochs)
-            invalid_idx_start = max(invalid_idx_start_1, invalid_idx_start_2)
+        #     # Get claimed invalid range
+        #     invalid_idx_start_1 = loss_dict.get('invalid_after_epoch', 0)
+        #     invalid_idx_start_2 = self.total_epochs - loss_dict.get('invalid_from_end', self.total_epochs)
+        #     invalid_idx_start = tf.math.maximum(invalid_idx_start_1, invalid_idx_start_2)
 
-            intersect = lambda l1, l2: list(set(l1) & set(l2)) 
+        #     # intersect = lambda l1, l2: list(set(l1) & set(l2)) 
 
-            full_range = list(range(self.total_epochs))            
-            invalid_range = list(range(invalid_idx_start, self.total_epochs))
-            valid_range_temp2 = [epoch_idx for epoch_idx in full_range if epoch_idx not in invalid_range]
+        #     # full_range = list(range(self.total_epochs))            
+        #     # invalid_range = list(range(invalid_idx_start, self.total_epochs))
+        #     # valid_range_temp2 = [epoch_idx for epoch_idx in full_range if epoch_idx not in invalid_range]
 
-            valid_range = intersect(valid_range_temp1, valid_range_temp2)
-            return self.current_epoch in valid_range
+        #     # valid_range = intersect(valid_range_temp1, valid_range_temp2)
+        #     # return self.current_epoch in valid_range
+        #     # return tf.math.greater(self.current_epoch, valid_idx_start) and tf.math.less(self.current_epoch, invalid_idx_start)
+        #     return tf.logical_and(tf.math.greater(self.current_epoch, valid_idx_start), tf.math.less(self.current_epoch, invalid_idx_start))
         
         def get_losses(x, y, cost_dict_list):
             loss = 0
             loss_dict = {}
             for cost_dict in cost_dict_list:
-                if not check_if_valid(cost_dict):
-                    continue
 
                 if cost_dict['name'] == 'l2' or cost_dict['name'] == 'mean_square_error':                
                     mask = get_mask(mode=cost_dict.get('mask',None),h=320,w=320)
@@ -351,12 +351,14 @@ class Unet_bn(object):
                 
                 loss += cost_dict['weight']*current_loss
                 loss_dict[current_loss_name] = current_loss
+                #loss +=  tf.cond(check_if_valid(cost_dict), lambda: cost_dict['weight']*current_loss, lambda: 0.0)                
+                #loss_dict[current_loss_name] = tf.cond(check_if_valid(cost_dict), lambda: current_loss, lambda: 0.0)
 
             loss_dict['total_loss'] = loss
             return loss_dict
         
         def head(img):
-            global sliceIdx
+            # global sliceIdx
             return img
         
         # Hydra
