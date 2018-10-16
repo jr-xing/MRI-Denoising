@@ -635,7 +635,7 @@ para_dict_30 = {
 
 para_str_31 = 'Idx_31-Loss_l2_masked_mid5-Loss-gradient_XY_masked_norm_invalid_end20-Reg_no-Drop_0.8-Ob_FULL_SEG_3C_motion-Gt_FULL_SEG-Hydra_8'
 para_dict_31 = {
-    'idx':30,
+    'idx':31,
     'losses':[
         {
         'name':'l2',
@@ -678,7 +678,8 @@ para_dict_31 = {
 
 
 # Re-run 29 without gradient in last 20 epochs
-para_str_32 = 'Idx_21-Loss_l2_masked_mid5-Loss-gradient_XY_masked_norm_invalid_end_20-Reg_no-Drop_0.7-Ob_FULL_SEG_3C_motion-Gt_FULL_SEG'
+# para_str_32 = 'Idx_21-Loss_l2_masked_mid5-Loss-gradient_XY_masked_norm_invalid_end_20-Reg_no-Drop_0.7-Ob_FULL_SEG_3C_motion-Gt_FULL_SEG'
+para_str_32 = 'Idx_32-Loss_l2_masked_mid5-Loss-gradient_XY_masked_norm_invalid_end_20-Reg_no-Drop_0.7-Ob_FULL_SEG_3C_motion-Gt_FULL_SEG'
 para_dict_32 = {
     'idx':32,
     'losses':[
@@ -719,6 +720,41 @@ para_dict_32 = {
     'GPU_IND':'3'
 }
 
+# Re-run 31 with only l2 loss without mask
+para_str_33 = 'Idx_33-Loss_l2_masked_mid5-Loss-gradient_XY_masked_norm_invalid_end20-Reg_no-Drop_0.8-Ob_FULL_SEG_3C_motion-Gt_FULL_SEG-Hydra_8'
+para_dict_33 = {
+    'idx':33,
+    'losses':[
+        {
+        'name':'l2',
+        'weight':1}],
+    'reg':None,
+    'Keep':0.8,
+    'Ob':'FULL_SEG_3C_motion',
+    'Gt':'FULL_SEG',
+    'kwargs' : {
+        "layers": 5,           # how many resolution levels we want to have
+        "conv_times": 2,       # how many times we want to convolve in each level
+        "features_root": 64,   # how many feature_maps we want to have as root (the following levels will calculate the feature_map by multiply by 2, exp, 64, 128, 256)
+        "filter_size": 3,      # filter size used in convolution
+        "pool_size": 2,        # pooling size used in max-pooling
+        "summaries": True,
+        "get_loss_dict": True,
+        "layers":3,
+        "batch_size": 5,
+        "valid_size": 5,
+        'n_classes':8
+    },
+    'proc_dict':{
+        'data':{},
+        'truth':{}        
+    },    
+    'epochs':200,
+    'optimizer': 'adam',
+    'server': '2',
+    'GPU_IND':'2'
+}
+
 # para_str_24 = 'Idx_24-Test'
 # para_dict_24 = {
 #     'idx':24,
@@ -749,8 +785,8 @@ para_dict_32 = {
 #     'GPU_IND':'2'
 # }
 
-para_dict_use = para_dict_32
-para_str_use = para_str_32
+para_dict_use = para_dict_33
+para_str_use = para_str_33
 
 # here indicating the GPU you want to use. if you don't have GPU, just leave it.
 gpu_ind = para_dict_use.get('GPU_IND', '3')

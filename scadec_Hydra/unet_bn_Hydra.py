@@ -89,11 +89,13 @@ class Unet_bn(object):
         # variables need to be calculated
         # self.recons = unet_decoder(self.x, self.keep_prob, self.phase, self.img_channels, self.truth_channels, **kwargs)
         # Xing
-        self.structure = kwargs.get('structure','Hrdra')
+        self.structure = kwargs.get('structure','Hydra')
         if self.structure == 'Hydra':
             self.necks = unet_decoder(self.x, self.keep_prob, self.phase, self.img_channels, self.truth_channels, **kwargs)
         elif self.structure == 'Nagini':
             self.recons = unet_decoder(self.x, self.keep_prob, self.phase, self.img_channels, self.truth_channels, **kwargs)
+        else:
+            raise ValueError('Unknown Net Structure: '+self.structure)
         # self.recons, self.dw_h_convs, _ = unet_decoder(self.x, self.keep_prob, self.phase, self.img_channels, self.truth_channels, **kwargs)
         # self.recons = tf.reshape(unet_decoder(self.x, self.keep_prob, self.phase, self.img_channels, self.truth_channels, **kwargs),[5,160,160,3])
         
@@ -146,7 +148,8 @@ class Unet_bn(object):
 
         """
         #Tracer()        
-        # dprint('_get_cost')
+        # ddprint('_get_cost')
+        dprint('Computing Cost...')
         total_pixels = self.nx * self.ny * self.truth_channels
 
         def get_mask(mode = 'default', h = 320, w = 320):
@@ -281,10 +284,14 @@ class Unet_bn(object):
             else:
                 total_loss_dict[cost_dict['name']] = 0
         
+        dprint('Structure: '+self.structure)
         if self.structure == 'Hydra':
+            dprint('Init self.recons:')
             self.recons = None
+            dprint(self.recons)
+            dprint('batch_size: {}'.format(self.batch_size))
             for img_idx in range(self.batch_size):            
-                img_class_onehot = self.batch_cls[img_idx, :]            
+                img_class_onehot = self.batch_cls[img_idx, :]
                 recon = tf.reshape(tf.dynamic_partition(self.necks, img_class_onehot, 2, name = 'part_necks')[0][0][img_idx,:,:,:],[1,320,320,self.truth_channels], name = 'reshape_recon')                  
                 y = tf.reshape(self.y[img_idx,:,:,:],[1,320,320,self.truth_channels])
 
@@ -292,16 +299,21 @@ class Unet_bn(object):
                 loss_dict = get_losses(recon, y, cost_dict_list)                
                 
                 if self.recons == None:
+                    dprint('Create self.recons')
                     self.recons = recon
                 else:
-                    self.recons = tf.concat([self.recons, recon],axis=0)
-                    print('Current recons:')
-                    print(self.recons.shape)        
+                    dprint('Concat self.recons')
+                    self.recons = tf.concat([self.recons, recon],axis=0)                                        
+                    
+
+                for key, value in loss_dict.items():
+                    total_loss_dict[key] += value
+
         elif self.structure == 'Nagini':
             loss_dict = get_losses(self.recons, self.y, cost_dict_list)
 
-        for key, value in loss_dict.items():
-            total_loss_dict[key] += value
+            for key, value in loss_dict.items():
+                total_loss_dict[key] += value
 
         return total_loss_dict
 
