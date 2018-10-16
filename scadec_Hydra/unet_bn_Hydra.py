@@ -249,6 +249,7 @@ class Unet_bn(object):
                             loss_edge_masked = tf.losses.mean_squared_error(tf.multiply(edge_x, mask), tf.multiply(edge_y, mask))
                         current_loss = loss_edge_masked
                         current_loss_name = cost_dict['edge_type']
+                    current_loss = tf.cond(tf.less(self.current_epoch, self.total_epochs-20), lambda:current_loss, lambda:0.0)
                 else:
                     raise ValueError("Unknown cost function: "+cost_dict['name'])
 
@@ -256,7 +257,7 @@ class Unet_bn(object):
                     #current_loss =  tf.clip_by_value(current_loss, 0.0, cost_dict.get('upper_bound',0.5))
                     current_loss =  tf.clip_by_norm(current_loss, cost_dict.get('upper_bound',0.5))
                 
-                current_loss = tf.cond(tf.less(self.current_epoch, self.total_epochs-20), lambda:current_loss, lambda:0.0)
+                
                 loss += cost_dict['weight']*current_loss
                 loss_dict[current_loss_name] = current_loss
                 #loss +=  tf.cond(check_if_valid(cost_dict), lambda: cost_dict['weight']*current_loss, lambda: 0.0)                
