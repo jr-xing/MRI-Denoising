@@ -676,6 +676,49 @@ para_dict_31 = {
     'GPU_IND':'3'
 }
 
+
+# Re-run 29 without gradient in last 20 epochs
+para_str_32 = 'Idx_21-Loss_l2_masked_mid5-Loss-gradient_XY_masked_norm_invalid_end_20-Reg_no-Drop_0.7-Ob_FULL_SEG_3C_motion-Gt_FULL_SEG'
+para_dict_32 = {
+    'idx':32,
+    'losses':[
+        {
+        'name':'l2',
+        'weight':1,
+        'mask':'mid5'},
+        {
+        'name':'edge',
+        'edge_type':'gradient',
+        'weight':10,
+        'mask':'norm',
+        'mask_before_operate':False,
+        'get_XY':True,
+        'invalid_after':200
+        }],
+    'reg':None,
+    'Keep':0.7,
+    'Ob':'FULL_SEG_3C_motion',
+    'Gt':'FULL_SEG',
+    'kwargs' : {
+        "layers": 5,           # how many resolution levels we want to have
+        "conv_times": 2,       # how many times we want to convolve in each level
+        "features_root": 64,   # how many feature_maps we want to have as root (the following levels will calculate the feature_map by multiply by 2, exp, 64, 128, 256)
+        "filter_size": 3,      # filter size used in convolution
+        "pool_size": 2,        # pooling size used in max-pooling
+        "summaries": True,
+        "get_loss_dict": True,
+        'structure':'Nagini'# Or Hydra
+    },
+    'proc_dict':{
+        'data':{},
+        'truth':{}        
+    },
+    'epochs':220,    
+    'optimizer': 'adam',
+    'server': '1',
+    'GPU_IND':'3'
+}
+
 # para_str_24 = 'Idx_24-Test'
 # para_dict_24 = {
 #     'idx':24,
@@ -706,8 +749,8 @@ para_dict_31 = {
 #     'GPU_IND':'2'
 # }
 
-para_dict_use = para_dict_31
-para_str_use = para_str_31
+para_dict_use = para_dict_32
+para_str_use = para_str_32
 
 # here indicating the GPU you want to use. if you don't have GPU, just leave it.
 gpu_ind = para_dict_use.get('GPU_IND', '3')
@@ -794,8 +837,8 @@ else:
     training_iters = 700
         
 
-data_provider = image_util.SimpleDataProvider(data, truths, data_cls = data_cls, data_cls_num=para_dict_use['kwargs']['n_classes'], process_dict = para_dict_use['proc_dict'], onehot_cls=True)
-valid_provider = image_util.SimpleDataProvider(vdata, vtruths, data_cls = vdata_cls, data_cls_num=para_dict_use['kwargs']['n_classes'], process_dict = para_dict_use['proc_dict'], onehot_cls=True)
+data_provider = image_util.SimpleDataProvider(data, truths, data_cls = data_cls, data_cls_num=para_dict_use['kwargs'].get('n_classes',1), process_dict = para_dict_use['proc_dict'], onehot_cls=True)
+valid_provider = image_util.SimpleDataProvider(vdata, vtruths, data_cls = vdata_cls, data_cls_num=para_dict_use['kwargs'].get('n_classes',1), process_dict = para_dict_use['proc_dict'], onehot_cls=True)
 
 
 # -----------------------------------Loss------------------------------------------------------- #

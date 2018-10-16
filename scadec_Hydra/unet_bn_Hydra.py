@@ -89,17 +89,19 @@ class Unet_bn(object):
         # variables need to be calculated
         # self.recons = unet_decoder(self.x, self.keep_prob, self.phase, self.img_channels, self.truth_channels, **kwargs)
         # Xing
-        self.necks = unet_decoder(self.x, self.keep_prob, self.phase, self.img_channels, self.truth_channels, **kwargs)
+        self.structure = kwargs.get('structure','Hrdra')
+        if self.structure == 'Hydra':
+            self.necks = unet_decoder(self.x, self.keep_prob, self.phase, self.img_channels, self.truth_channels, **kwargs)
+        elif self.structure == 'Nagini':
+            self.recons = unet_decoder(self.x, self.keep_prob, self.phase, self.img_channels, self.truth_channels, **kwargs)
         # self.recons, self.dw_h_convs, _ = unet_decoder(self.x, self.keep_prob, self.phase, self.img_channels, self.truth_channels, **kwargs)
         # self.recons = tf.reshape(unet_decoder(self.x, self.keep_prob, self.phase, self.img_channels, self.truth_channels, **kwargs),[5,160,160,3])
         
         # Additional info
+        # Array Version
         # self.batch_cls = tf.placeholder(tf.int32,[None], name='batch_cls')
         # one hot version
-        self.batch_cls = tf.placeholder(tf.int32,[None, kwargs['n_classes']], name='batch_cls')
-        #self.additional_info_str = tf.placeholder('string',[None])
-        #self.additional_info_dict_list = self.additional_info_str.eval()
-        # self.mouth_func = mouth_func
+        self.batch_cls = tf.placeholder(tf.int32,[None, kwargs.get('n_classes',1)], name='batch_cls')
 
         # Xing        
         self.loss_dict = self._get_cost(cost_dict_list)
@@ -254,6 +256,7 @@ class Unet_bn(object):
                     #current_loss =  tf.clip_by_value(current_loss, 0.0, cost_dict.get('upper_bound',0.5))
                     current_loss =  tf.clip_by_norm(current_loss, cost_dict.get('upper_bound',0.5))
                 
+                current_loss = tf.cond(tf.less(self.current_epoch, self.total_epochs-20), lambda:current_loss, lambda:0.0)
                 loss += cost_dict['weight']*current_loss
                 loss_dict[current_loss_name] = current_loss
                 #loss +=  tf.cond(check_if_valid(cost_dict), lambda: cost_dict['weight']*current_loss, lambda: 0.0)                
@@ -277,78 +280,28 @@ class Unet_bn(object):
             else:
                 total_loss_dict[cost_dict['name']] = 0
         
-        self.recons = None
+        if self.structure == 'Hydra':
+            self.recons = None
+            for img_idx in range(self.batch_size):            
+                img_class_onehot = self.batch_cls[img_idx, :]            
+                recon = tf.reshape(tf.dynamic_partition(self.necks, img_class_onehot, 2, name = 'part_necks')[0][0][img_idx,:,:,:],[1,320,320,self.truth_channels], name = 'reshape_recon')                  
+                y = tf.reshape(self.y[img_idx,:,:,:],[1,320,320,self.truth_channels])
 
-        for img_idx in range(self.batch_size):
-            # cls_0 = lambda: 0
-            # cls_1 = lambda: 1
-            # cls_2 = lambda: 2
-            # cls_3 = lambda: 3
-            # cls_4 = lambda: 4
-            # cls_5 = lambda: 5
-            # cls_6 = lambda: 6
-            # cls_7 = lambda: 7
+                # Compute Losses for this single img in batch
+                loss_dict = get_losses(recon, y, cost_dict_list)                
+                
+                if self.recons == None:
+                    self.recons = recon
+                else:
+                    self.recons = tf.concat([self.recons, recon],axis=0)
+                    print('Current recons:')
+                    print(self.recons.shape)        
+        elif self.structure == 'Nagini':
+            loss_dict = get_losses(self.recons, self.y, cost_dict_list)
 
-            # img_class = tf.case({
-            #     tf.equal(self.batch_cls[img_idx][0], tf.constant(0)): cls_0,
-            #     tf.equal(self.batch_cls[img_idx][0], tf.constant(1)): cls_1,
-            #     tf.equal(self.batch_cls[img_idx][0], tf.constant(2)): cls_2,
-            #     tf.equal(self.batch_cls[img_idx][0], tf.constant(3)): cls_3,
-            #     tf.equal(self.batch_cls[img_idx][0], tf.constant(4)): cls_4,
-            #     tf.equal(self.batch_cls[img_idx][0], tf.constant(5)): cls_5,
-            #     tf.equal(self.batch_cls[img_idx][0], tf.constant(6)): cls_6,
-            #     tf.equal(self.batch_cls[img_idx][0], tf.constant(7)): cls_7,
-            # })
+        for key, value in loss_dict.items():
+            total_loss_dict[key] += value
 
-            # Get recon
-            # recon = 0
-            # for neckIdx, neck in enmuerate(self.necks):
-            #     recon += neck*tf.cond(tf.equal(self.batch_cls[img_idx]))
-
-            # Ways to slice self.necks
-            # 1. get_variable
-
-            # img_class = self.batch_cls[img_idx]
-            # print('SHape of batch_cls!')
-            # print(self.batch_cls.shape)
-            # img_class = tf.slice(self.batch_cls, [img_idx], [1], name = 'get_image_cls')
-            # recon = self.necks[img_class]
-            # img_class = tf.gather(self.batch_cls, img_idx)[0]
-            # img_class = self.batch_cls[img_idx]
-            img_class_onehot = self.batch_cls[img_idx, :]
-            # recon = tf.nn.embedding_lookup()
-            # recon = tf.slice(self.necks)
-            # print('Neck')
-            # print(self.necks[0].shape)
-            # print('Shape after dynamic partition')
-            # print(tf.dynamic_partition(self.necks, img_class_onehot, 2, name = 'part_necks')[0][img_idx,:,:,:].shape)
-            recon = tf.reshape(tf.dynamic_partition(self.necks, img_class_onehot, 2, name = 'part_necks')[0][0][img_idx,:,:,:],[1,320,320,self.truth_channels], name = 'reshape_recon')
-            # recon = tf.reshape(tf.gather(self.necks, img_class, name = 'gather_neck')[img_idx,:,:,:],[1,320,320,self.truth_channels])
-            # recon = tf.reshape(self.necks[0][img_idx,:,:,:],[1,320,320,self.truth_channels])
-
-            # partitions = []
-            # recon = tf.reshape(tf.dynamic_partition(self.necks, img_class)[0],[1,320,320,self.truth_channels])
-
-            if self.recons == None:
-                self.recons = recon
-            else:
-                self.recons = tf.concat([self.recons, recon],axis=0)
-                print('Current recons:')
-                print(self.recons.shape)
-
-            # recon = tf.get_tensor_by_name('necks_'+ str(self.batch_cls[img_idx]) + '_conv2truth_channels')
-            # recon = tf.slice(self.necks, img_class, 1)
-            y = tf.reshape(self.y[img_idx,:,:,:],[1,320,320,self.truth_channels])
-
-            #recon = head(tf.reshape(self.recons[img_idx,:,:,:],[1,320,320,self.truth_channels]))
-            # y = head(tf.reshape(self.y[img_idx,:,:,:],[1,320,320,self.truth_channels]))
-
-            # Compute Losses for this single img in batch
-            loss_dict = get_losses(recon, y, cost_dict_list)
-
-            for key, value in loss_dict.items():
-                total_loss_dict[key] += value
-        
         return total_loss_dict
 
 

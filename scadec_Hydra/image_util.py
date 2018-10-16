@@ -87,18 +87,22 @@ class SimpleDataProvider(BaseDataProvider):
 
         if self.onehot_cls:
             batch_cls = np.zeros([n, self.data_cls_num])
-            # print('batch_cls created')
-            # print(batch_cls)
         else:
             batch_cls = np.zeros(n)
 
-        for i in range(n):
-            X[i] = self._process_data(self.data[idx[i]])
-            Y[i] = self._process_truths(self.truths[idx[i]])
-            if self.onehot_cls:
-                batch_cls[i, self.data_cls[idx[i]]] = 1
-            else:    
-                batch_cls[i] = self.data_cls[idx[i]]
+        if self.data_cls_num == 1:
+            for i in range(n):
+                X[i] = self._process_data(self.data[idx[i]])
+                Y[i] = self._process_truths(self.truths[idx[i]])
+        else:            
+
+            for i in range(n):
+                X[i] = self._process_data(self.data[idx[i]])
+                Y[i] = self._process_truths(self.truths[idx[i]])
+                if self.onehot_cls:
+                    batch_cls[i, self.data_cls[idx[i]]] = 1
+                else:    
+                    batch_cls[i] = self.data_cls[idx[i]]
         
         # print('(In data Provider)')
         # print('onehot_cls:')
@@ -120,16 +124,22 @@ class SimpleDataProvider(BaseDataProvider):
         else:
             batch_cls = np.zeros(n)
 
-        for i in range(n):
-            X[i] = self._process_data(self.data[i])
-            Y[i] = self._process_truths(self.truths[i])
-            # print('self.data_cls[i]')
-            # print(type(self.data_cls[i]))
-            # print(self.data_cls[i])
-            if self.onehot_cls:
-                batch_cls[i, self.data_cls[i]] = 1
-            else:    
-                batch_cls[i] = self.data_cls[i]
+        if self.data_cls_num == 1:
+            for i in range(n):
+                X[i] = self._process_data(self.data[i])
+                Y[i] = self._process_truths(self.truths[i])
+        else:            
+            for i in range(n):
+                X[i] = self._process_data(self.data[i])
+                Y[i] = self._process_truths(self.truths[i])
+                # print('self.data_cls[i]')
+                # print(type(self.data_cls[i]))
+                # print(self.data_cls[i])
+                if self.onehot_cls:
+                    batch_cls[i, self.data_cls[i]] = 1
+                else:    
+                    batch_cls[i] = self.data_cls[i]
+        
         return X, Y, batch_cls
 
     def _full_batch(self):

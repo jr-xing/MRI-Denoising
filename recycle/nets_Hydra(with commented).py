@@ -9,8 +9,8 @@ import logging
 import tensorflow as tf
 import tensorflow.contrib as contrib
 
-from scadec_Hydra import util
-from scadec_Hydra.layers import *
+from scadec import util
+from scadec.layers import *
 
         # "get_loss_dict": True,
         # "batch_size": 5,
@@ -97,17 +97,16 @@ def unet_decoder(x, keep_prob, phase, img_channels, truth_channels, layers=3, co
         with tf.variable_scope("conv2d_1by1"):
             output = conv2d(in_node, 1, truth_channels, keep_prob, 'conv2truth_channels')
             up_h_convs["out"] = output
-    elif structure == 'Hydra':
+    else:
         # Necks - Xing
         with tf.variable_scope("necks_"):
             for neck_idx in range(n_classes):
                 # print('Shape of in_node')
                 # print(in_node.shape)
-                # Comment if OOM
-                neck_1 = conv2d_bn_relu(in_node, 3, 5, keep_prob, phase, '{}_1'.format(neck_idx))
+                # neck_1 = conv2d_bn_relu(in_node, 3, 5, keep_prob, phase, '{}_1'.format(neck_idx))
                 # print('Shape of neck1')
                 # print(neck_1.shape)
-                neck_2 = conv2d_bn_relu(neck_1, 3, truth_channels, keep_prob, phase, '{}_2'.format(neck_idx))
+                neck_2 = conv2d_bn_relu(in_node, 3, truth_channels, keep_prob, phase, '{}_2'.format(neck_idx))
                 print('Shape of neck2')
                 print(neck_2.shape)
                 neck_3 = conv2d(neck_2, 1, truth_channels, keep_prob, '{}_conv2truth_channels'.format(neck_idx))
@@ -115,8 +114,6 @@ def unet_decoder(x, keep_prob, phase, img_channels, truth_channels, layers=3, co
                 print(neck_3.shape)
                 # necks[neck_idx] = neck_3
                 necks.append(neck_3)
-    else:
-        raise ValueError('Unknown Net Structure: {}'.format(structure))
     
     if summaries:
         # for i, (c1, c2) in enumerate(convs):
