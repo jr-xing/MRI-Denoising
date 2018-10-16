@@ -48,27 +48,53 @@ def h5py_mat2npy(datemat):
 #         if sliceIdx < 0:
 #             return dict['a']
 
+# def idx_classify_old(idx_array, n_classes = 8, mode='equally'):
+#     """ Classify images by slice index(location) """
+#     class_array = np.ones(np.shape(idx_array), dtype=np.int32)*(-1)
+#     if mode == 'equally':
+#         interval = int((idx_array.max() - idx_array.min() + 1)/n_classes)
+#         for class_idx in range(n_classes-1):
+#             idx_start = class_idx * interval + idx_array.min()
+#             idx_end = (class_idx+1) * interval + idx_array.min()
+#             class_array[(idx_array>=idx_start)&(idx_array<idx_end)] = class_idx
+#             # print(idx_end)
+#         # print((n_classes-1) * interval)        
+#         class_array[(n_classes-1) * interval:] = n_classes - 1
+#         return class_array
+
+#     elif mode == 'equally_960':
+#         interval = int((960 - 1 + 1)/n_classes)
+#         for class_idx in range(n_classes-1):
+#             idx_start = class_idx * interval + 1
+#             idx_end = (class_idx+1) * interval + 1
+#             class_array[(idx_array>=idx_start)&(idx_array<idx_end)] = class_idx
+#         class_array[(n_classes-1) * interval:] = n_classes - 1
+#         return class_array
+#     elif mode == 'all_zero':
+#         return class_array*0
+
+#     else:
+#         raise ValueError('Unknown classification method: {}'.format(mode))
+
 def idx_classify(idx_array, n_classes = 8, mode='equally'):
     """ Classify images by slice index(location) """
     class_array = np.ones(np.shape(idx_array), dtype=np.int32)*(-1)
     if mode == 'equally':
         interval = int((idx_array.max() - idx_array.min() + 1)/n_classes)
-        for class_idx in range(n_classes-1):
+        for class_idx in range(n_classes):
             idx_start = class_idx * interval + idx_array.min()
             idx_end = (class_idx+1) * interval + idx_array.min()
             class_array[(idx_array>=idx_start)&(idx_array<idx_end)] = class_idx
             # print(idx_end)
         # print((n_classes-1) * interval)        
-        class_array[(n_classes-1) * interval:] = n_classes - 1
         return class_array
 
     elif mode == 'equally_960':
         interval = int((960 - 1 + 1)/n_classes)
-        for class_idx in range(n_classes-1):
+        for class_idx in range(n_classes):
             idx_start = class_idx * interval + 1
             idx_end = (class_idx+1) * interval + 1
             class_array[(idx_array>=idx_start)&(idx_array<idx_end)] = class_idx
-        class_array[(n_classes-1) * interval:] = n_classes - 1
         return class_array
     elif mode == 'all_zero':
         return class_array*0
