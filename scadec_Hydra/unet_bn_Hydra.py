@@ -90,7 +90,7 @@ class Unet_bn(object):
         # self.recons = unet_decoder(self.x, self.keep_prob, self.phase, self.img_channels, self.truth_channels, **kwargs)
         # Xing
         self.structure = kwargs.get('structure','Hydra')
-        if self.structure == 'Hydra':
+        if self.structure == 'Hydra' or self.structure == 'HydraEr':
             self.necks = unet_decoder(self.x, self.keep_prob, self.phase, self.img_channels, self.truth_channels, **kwargs)
         elif self.structure == 'Nagini':
             self.recons = unet_decoder(self.x, self.keep_prob, self.phase, self.img_channels, self.truth_channels, **kwargs)
@@ -285,7 +285,7 @@ class Unet_bn(object):
                 total_loss_dict[cost_dict['name']] = 0
         
         dprint('Structure: '+self.structure)
-        if self.structure == 'Hydra':
+        if self.structure == 'Hydra' or self.structure == 'HydraEr':
             dprint('Init self.recons:')
             self.recons = None
             dprint(self.recons)

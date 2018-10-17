@@ -16,8 +16,13 @@ from scadec_Hydra.layers import *
         # "batch_size": 5,
         # "valid_size": 5,
         # 'n_classes':8
+IFDEBUG = False
+def dprint(string):
+    global IFDEBUG
+    if IFDEBUG:
+        print(string)
 
-def unet_decoder(x, keep_prob, phase, img_channels, truth_channels, layers=3, conv_times=3, features_root=16, filter_size=3, pool_size=2, summaries=True, get_loss_dict = True, batch_size = 5, valid_size = 5, n_classes = 8, structure='Hydra'):
+def unet_decoder(x, keep_prob, phase, img_channels, truth_channels, layers=3, conv_times=3, features_root=16, filter_size=3, pool_size=2, summaries=True, get_loss_dict = True, batch_size = 5, valid_size = 5, n_classes = 8, structure='Hydra', neck_len = 3):
     """
     Creates a new convolutional unet for the given parametrization.
     
@@ -73,48 +78,97 @@ def unet_decoder(x, keep_prob, phase, img_channels, truth_channels, layers=3, co
     in_node = dw_h_convs[layers-1]
         
     # Up layers
-    for layer in range(layers-2, -1, -1):
-        features = 2**(layer+1)*features_root
-        with tf.variable_scope('up_layer_' + str(layer)):
-            with tf.variable_scope('unsample_concat_layer'):
-                # number of features = lower layer's number of features
-                h_deconv = deconv2d_bn_relu(in_node, filter_size, features//2, pool_size, keep_prob, phase, 'unsample_layer')
-                h_deconv_concat = concat(dw_h_convs[layer], h_deconv)
-                deconvs[layer] = h_deconv_concat
-                in_node = h_deconv_concat
+    if structure == 'HydraEr':
+        for layer in range(layers-2, -1, -1):
+            dprint('uplayer {}'.format(layer))
+            features = 2**(layer+1)*features_root
+            with tf.variable_scope('up_layer_' + str(layer)):
+                with tf.variable_scope('unsample_concat_layer'):
+                    # number of features = lower layer's number of features
+                    dprint('deconv...')
+                    h_deconv = deconv2d_bn_relu(in_node, filter_size, features//2, pool_size, keep_prob, phase, 'unsample_layer')
+                    h_deconv_concat = concat(dw_h_convs[layer], h_deconv)
+                    deconvs[layer] = h_deconv_concat
+                    in_node = h_deconv_concat
+                if layer > 0:
+                    for conv_iter in range(0, conv_times):
+                        scope = 'conv_bn_relu_{}'.format(conv_iter)
+                        conv = conv2d_bn_relu(in_node, filter_size, features//2, keep_prob, phase, scope)    
+                        in_node = conv         
+                    up_h_convs[layer] = in_node
+                elif layer == 0:
+                    dprint('total cls: {}'.format(n_classes))
+                    for neck_idx in range(n_classes):
+                        dprint('Processing neck {}'.format(neck_idx))
+                        in_node = h_deconv_concat
+                        for conv_iter in range(0, conv_times):
+                            scope = 'conv_bn_relu_{}_cls_{}'.format(conv_iter, neck_idx)
+                            conv = conv2d_bn_relu(in_node, filter_size, features//2, keep_prob, phase, scope)    
+                            in_node = conv
+                        necks.append(in_node)
+                        up_h_convs['neck_{}'.format(neck_idx)] = in_node
+        dprint('In total {} necks'.format(len(necks)))
+        dprint(in_node.shape)
+                
+    elif structure == 'Nagini' or structure == 'Hydra':
+        for layer in range(layers-2, -1, -1):
+            features = 2**(layer+1)*features_root
+            with tf.variable_scope('up_layer_' + str(layer)):
+                with tf.variable_scope('unsample_concat_layer'):
+                    # number of features = lower layer's number of features
+                    h_deconv = deconv2d_bn_relu(in_node, filter_size, features//2, pool_size, keep_prob, phase, 'unsample_layer')
+                    h_deconv_concat = concat(dw_h_convs[layer], h_deconv)
+                    deconvs[layer] = h_deconv_concat
+                    in_node = h_deconv_concat
 
-            for conv_iter in range(0, conv_times):
-                scope = 'conv_bn_relu_{}'.format(conv_iter)
-                conv = conv2d_bn_relu(in_node, filter_size, features//2, keep_prob, phase, scope)    
-                in_node = conv            
+                for conv_iter in range(0, conv_times):
+                    scope = 'conv_bn_relu_{}'.format(conv_iter)
+                    conv = conv2d_bn_relu(in_node, filter_size, features//2, keep_prob, phase, scope)    
+                    in_node = conv            
 
-            up_h_convs[layer] = in_node
+                up_h_convs[layer] = in_node
 
-    in_node = up_h_convs[0]
+        in_node = up_h_convs[0]
+    else:
+        raise ValueError('Unknown Net Structure: {}'.format(structure))
 
     if structure == 'Nagini':
         # Output with residual
         with tf.variable_scope("conv2d_1by1"):
             output = conv2d(in_node, 1, truth_channels, keep_prob, 'conv2truth_channels')
             up_h_convs["out"] = output
+    elif structure == 'HydraEr':
+        for neck_idx in range(n_classes):
+            with tf.variable_scope("conv2d_1by1_cls_{}".format(neck_idx)):
+                dprint('Processing neck {}'.format(neck_idx))
+                necks[neck_idx] = conv2d(necks[neck_idx], 1, truth_channels, keep_prob, 'conv2truth_channels')
+                up_h_convs["out"] = necks[neck_idx]
+
     elif structure == 'Hydra':
-        # Necks - Xing
+        # Necks - Xing        
         with tf.variable_scope("necks_"):
-            for neck_idx in range(n_classes):
+            neck_features = [3,5,7]
+            for neck_idx in range(n_classes):                
+                for neck_layer_idx in range(neck_len-1):
+                    in_node = conv2d(in_node, 3, neck_features[neck_len-2 -neck_layer_idx], keep_prob, '{}_{}'.format(neck_idx, neck_layer_idx))
+                output = conv2d(in_node, 1, truth_channels, keep_prob, '{}_conv2truth_channels'.format(neck_idx))
+                necks.append(output)
+                    
                 # print('Shape of in_node')
                 # print(in_node.shape)
                 # Comment if OOM
-                neck_1 = conv2d_bn_relu(in_node, 3, 5, keep_prob, phase, '{}_1'.format(neck_idx))
+                # neck_1 = conv2d_bn_relu(in_node, 3, 5, keep_prob, phase, '{}_1'.format(neck_idx))
                 # print('Shape of neck1')
                 # print(neck_1.shape)
-                neck_2 = conv2d_bn_relu(neck_1, 3, truth_channels, keep_prob, phase, '{}_2'.format(neck_idx))
-                print('Shape of neck2')
-                print(neck_2.shape)
-                neck_3 = conv2d(neck_2, 1, truth_channels, keep_prob, '{}_conv2truth_channels'.format(neck_idx))
-                print('Shape of neck3')
-                print(neck_3.shape)
+                # neck_2 = conv2d_bn_relu(neck_1, 3, truth_channels, keep_prob, phase, '{}_2'.format(neck_idx))
+                # dprint('Shape of neck2')
+                # dprint(neck_2.shape)
+                # neck_3 = conv2d(neck_2, 1, truth_channels, keep_prob, '{}_conv2truth_channels'.format(neck_idx))
+                # neck_3 = conv2d(in_node, 1, truth_channels, keep_prob, '{}_conv2truth_channels'.format(neck_idx))
+                # dprint('Shape of neck3')
+                # dprint(neck_3.shape)
                 # necks[neck_idx] = neck_3
-                necks.append(neck_3)
+                # necks.append(neck_3)
     else:
         raise ValueError('Unknown Net Structure: {}'.format(structure))
     
@@ -139,7 +193,7 @@ def unet_decoder(x, keep_prob, phase, img_channels, truth_channels, layers=3, co
     # return output#, dw_h_convs, up_h_convs
     if structure == 'Nagini':
         return output
-    elif structure == 'Hydra':
+    elif structure == 'Hydra' or structure == 'HydraEr':
         return necks
     else:
         raise ValueError('Unknown Net Structure: {}'.format(structure))
