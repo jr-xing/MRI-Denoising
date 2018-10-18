@@ -869,7 +869,7 @@ para_dict_36 = {
         'mask':'norm',
         'mask_before_operate':False,
         'get_XY':True,
-        'invalid_after':200
+        'invalid_last':20
         }],
     'reg':None,
     'Keep':0.8,
@@ -894,7 +894,7 @@ para_dict_36 = {
         'data':{},
         'truth':{}        
     },
-    'epochs':200,
+    'epochs':220,
     'optimizer': 'adam',
     'server': '2',
     'GPU_IND':'3'
@@ -930,8 +930,8 @@ para_dict_36 = {
 #     'GPU_IND':'2'
 # }
 
-para_dict_use = para_dict_35
-para_str_use = para_str_35
+para_dict_use = para_dict_36
+para_str_use = para_str_36
 
 print('Running '+ para_str_use)
 print(para_dict_use)
