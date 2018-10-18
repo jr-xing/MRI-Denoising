@@ -900,6 +900,98 @@ para_dict_36 = {
     'GPU_IND':'3'
 }
 
+# Re-run 34 with corrected net structure(layers = 5) and gradient loss
+para_str_37 = 'Idx_37-Loss_l2_masked_mid5-Loss-gradient_XY_masked_norm_w_10_invalid_end20-Reg_no-Drop_0.8-Ob_FULL_SEG_3C_motion-Gt_FULL_SEG-Hydra1_8'
+para_dict_37 = {
+    'idx':37,
+    'losses':[
+        {
+        'name':'l2',
+        'weight':1,
+        'mask':'mid5'},
+        {
+        'name':'edge',
+        'edge_type':'gradient',
+        'weight':10,
+        'mask':'norm',
+        'mask_before_operate':False,
+        'get_XY':True,
+        'invalid_after':200
+        }],
+    'reg':None,
+    'Keep':0.8,
+    'Ob':'FULL_SEG_3C_motion',
+    'Gt':'FULL_SEG',
+    'kwargs' : {
+        "layers": 5,           # how many resolution levels we want to have
+        "conv_times": 2,       # how many times we want to convolve in each level
+        "features_root": 64,   # how many feature_maps we want to have as root (the following levels will calculate the feature_map by multiply by 2, exp, 64, 128, 256)
+        "filter_size": 3,      # filter size used in convolution
+        "pool_size": 2,        # pooling size used in max-pooling
+        "summaries": True,
+        "get_loss_dict": True,
+        "batch_size": 5,
+        "valid_size": 5,
+        'structure': 'Hydra',
+        'neck_len': 1,
+        'n_classes': 8
+    },
+    'proc_dict':{
+        'data':{},
+        'truth':{}        
+    },
+    'epochs':220,
+    'optimizer': 'adam',
+    'server': '1',
+    'GPU_IND':'2'
+}
+
+# Should be 38!
+para_str_38 = 'Idx_37-Loss_l2_masked_mid5-Loss-gradient_XY_masked_norm_w_10_invalid_end20-Reg_no-Drop_0.8-Ob_FULL_SEG_3C_motion-Gt_FULL_SEG-Hydra3_8'
+para_dict_38 = {
+    'idx':38,
+    'losses':[
+        {
+        'name':'l2',
+        'weight':1,
+        'mask':'mid5'},
+        {
+        'name':'edge',
+        'edge_type':'gradient',
+        'weight':10,
+        'mask':'norm',
+        'mask_before_operate':False,
+        'get_XY':True,
+        'invalid_after':200
+        }],
+    'reg':None,
+    'Keep':0.8,
+    'Ob':'FULL_SEG_3C_motion',
+    'Gt':'FULL_SEG',
+    'kwargs' : {
+        "layers": 5,           # how many resolution levels we want to have
+        "conv_times": 2,       # how many times we want to convolve in each level
+        "features_root": 64,   # how many feature_maps we want to have as root (the following levels will calculate the feature_map by multiply by 2, exp, 64, 128, 256)
+        "filter_size": 3,      # filter size used in convolution
+        "pool_size": 2,        # pooling size used in max-pooling
+        "summaries": True,
+        "get_loss_dict": True,
+        "batch_size": 5,
+        "valid_size": 5,
+        'structure': 'Hydra',
+        'neck_len': 3,
+        'n_classes': 8
+    },
+    'proc_dict':{
+        'data':{},
+        'truth':{}        
+    },
+    'epochs':220,
+    'optimizer': 'adam',
+    'server': '1',
+    'GPU_IND':'3'
+}
+
 # para_str_24 = 'Idx_24-Test'
 # para_dict_24 = {
 #     'idx':24,
@@ -930,8 +1022,8 @@ para_dict_36 = {
 #     'GPU_IND':'2'
 # }
 
-para_dict_use = para_dict_36
-para_str_use = para_str_36
+para_dict_use = para_dict_38
+para_str_use = para_str_38
 
 print('Running '+ para_str_use)
 print(para_dict_use)
