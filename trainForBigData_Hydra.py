@@ -1037,6 +1037,92 @@ para_dict_39 = {
     'GPU_IND':'3'
 }
 
+# re-run 32(i.e. "21") with only 5 additional epochs
+para_str_1018 = 'Idx_1018-Loss_l2_masked_mid5-Loss-gradient_XY_masked_norm_w_10_invalid_end5-Reg_no-Drop_0.8-Ob_FULL_SEG_3C_motion-Gt_FULL_SEG-Nagini'
+para_dict_1018 = {
+    'idx':1018,
+    'losses':[
+        {
+        'name':'l2',
+        'weight':1,
+        'mask':'mid5'},
+        {
+        'name':'edge',
+        'edge_type':'gradient',
+        'weight':10,
+        'mask':'norm',
+        'mask_before_operate':False,
+        'get_XY':True,
+        # 'invalid_after':200
+        'invalid_last': 5
+        }],
+    'reg':None,
+    'Keep':0.7,
+    'Ob':'FULL_SEG_3C_motion',
+    'Gt':'FULL_SEG',
+    'kwargs' : {
+        "layers": 5,           # how many resolution levels we want to have
+        "conv_times": 2,       # how many times we want to convolve in each level
+        "features_root": 64,   # how many feature_maps we want to have as root (the following levels will calculate the feature_map by multiply by 2, exp, 64, 128, 256)
+        "filter_size": 3,      # filter size used in convolution
+        "pool_size": 2,        # pooling size used in max-pooling
+        "summaries": True,
+        "get_loss_dict": True,
+        'structure':'Nagini'# Or Hydra
+    },
+    'proc_dict':{
+        'data':{},
+        'truth':{}        
+    },
+    'epochs':205,    
+    'optimizer': 'adam',
+    'server': '2',
+    'GPU_IND':'3'
+}
+# para_dict_1018 = {
+#     'idx':1018,
+#     'losses':[
+#         {
+#         'name':'l2',
+#         'weight':1,
+#         'mask':'mid5'},
+#         {
+#         'name':'edge',
+#         'edge_type':'gradient',
+#         'weight':10,
+#         'mask':'norm',
+#         'mask_before_operate':False,
+#         'get_XY':True,
+#         'invalid_after':200
+#         }],
+#     'reg':None,
+#     'Keep':0.8,
+#     'Ob':'FULL_SEG_3C_motion',
+#     'Gt':'FULL_SEG',
+#     'kwargs' : {
+#         "layers": 4,           # how many resolution levels we want to have
+#         "conv_times": 2,       # how many times we want to convolve in each level
+#         "features_root": 64,   # how many feature_maps we want to have as root (the following levels will calculate the feature_map by multiply by 2, exp, 64, 128, 256)
+#         "filter_size": 3,      # filter size used in convolution
+#         "pool_size": 2,        # pooling size used in max-pooling
+#         "summaries": True,
+#         "get_loss_dict": True,
+#         "batch_size": 5,
+#         "valid_size": 5,
+#         'structure': 'Hydra',
+#         'neck_len': 2,
+#         'n_classes': 16
+#     },
+#     'proc_dict':{
+#         'data':{},
+#         'truth':{}        
+#     },
+#     'epochs':220,
+#     'optimizer': 'adam',
+#     'server': '2',
+#     'GPU_IND':'0'
+# }
+
 # para_str_24 = 'Idx_24-Test'
 # para_dict_24 = {
 #     'idx':24,
@@ -1067,8 +1153,8 @@ para_dict_39 = {
 #     'GPU_IND':'2'
 # }
 
-para_dict_use = para_dict_39
-para_str_use = para_str_39
+para_dict_use = para_dict_1018
+para_str_use = para_str_1018
 
 print('Running '+ para_str_use)
 print(para_dict_use)
