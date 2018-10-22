@@ -177,7 +177,16 @@ class Unet_bn(object):
                 maskN = (maskN-np.min(maskN))/np.max(maskN)
                 return np.float32(np.reshape(maskN,[w,h,1]))        
 
-        def get_edge(img, operator, get_XY = False):
+        def non_max_suppression(input, window_size = 3):
+            # From: https://stackoverflow.com/questions/42879109/tensorflow-non-maximum-suppression
+            # input: B x W x H x C
+            pooled = tf.nn.max_pool(input, ksize=[1, window_size, window_size, 1], strides=[1,1,1,1], padding='SAME')
+            output = tf.where(tf.equal(input, pooled), input, tf.zeros_like(input))
+
+            # Note: if input has negative values, the suppressed values can be higher than original 
+            return output # output: B X W X H x C
+
+        def get_edge(img, operator, get_XY = False, NMS = False, NMS_window_size = 3):
             # https://blog.csdn.net/huanghuangjin/article/details/81130171
             # https://www.cnblogs.com/wxl845235800/p/7700867.html
             if operator == 'gradient':
@@ -185,6 +194,10 @@ class Unet_bn(object):
                 gradY = tf.reshape(tf.constant([[0,1,0],[0,0,0],[0,-1,0]],tf.float32),[3, 3, 1, 1])
                 imgX = tf.nn.conv2d(img, gradX, strides=[1,1,1,1], padding='SAME')
                 imgY = tf.nn.conv2d(img, gradY, strides=[1,1,1,1], padding='SAME')
+                if NMS:
+                    imgX = non_max_suppression(imgX, NMS_window_size)
+                    imgY = non_max_suppression(imgY, NMS_window_size)
+
                 if get_XY:
                     return imgX, imgY
                 else:
@@ -229,13 +242,16 @@ class Unet_bn(object):
 
                         # Compute edge loss
                         if cost_dict.get('get_XY',False):
-                            edge_x_X,edge_x_Y = get_edge(x_masked, operator=cost_dict['edge_type'], get_XY=True)
-                            edge_y_X,edge_y_Y = get_edge(y_masked, operator=cost_dict['edge_type'], get_XY=True)
+                            edge_x_X,edge_x_Y = get_edge(x_masked, operator=cost_dict['edge_type'], get_XY=True, NMS=cost_dict.get('NMS', False), NMS_window_size=cost_dict.get('NMS_window_size', 3))
+                            edge_y_X,edge_y_Y = get_edge(y_masked, operator=cost_dict['edge_type'], get_XY=True, NMS=cost_dict.get('NMS', False), NMS_window_size=cost_dict.get('NMS_window_size', 3))
                             loss_masked_edge = tf.losses.absolute_difference(edge_x_X, edge_y_X)+tf.losses.absolute_difference(edge_x_Y, edge_y_Y)
                         else:
                             edge_x = get_edge(x_masked, operator=cost_dict['edge_type'])
                             edge_y = get_edge(y_masked, operator=cost_dict['edge_type'])
                             loss_masked_edge = tf.losses.mean_squared_error(edge_x, edge_y)   
+                        
+
+
                         # Loss
                         current_loss = loss_masked_edge
                         current_loss_name = cost_dict['edge_type']

@@ -1079,6 +1079,101 @@ para_dict_1018 = {
     'server': '2',
     'GPU_IND':'3'
 }
+
+# Re-run 39 without gradient mask and last 20
+para_str_40 = 'Idx_40-Loss_l2_masked_mid5-Loss-gradient_XY_w_10-Reg_no-Drop_0.8-Ob_FULL_SEG_3C_motion-Gt_FULL_SEG-Hydra4_2_16'
+para_dict_40 = {
+    'idx':40,
+    'losses':[
+        {
+        'name':'l2',
+        'weight':1,
+        'mask':'mid5'},
+        {
+        'name':'edge',
+        'edge_type':'gradient',
+        'weight':10,
+        'mask':None,
+        'mask_before_operate':False,
+        'get_XY':True,
+        'invalid_last':0
+        }],
+    'reg':None,
+    'Keep':0.8,
+    'Ob':'FULL_SEG_3C_motion',
+    'Gt':'FULL_SEG',
+    'kwargs' : {
+        "layers": 4,           # how many resolution levels we want to have
+        "conv_times": 2,       # how many times we want to convolve in each level
+        "features_root": 64,   # how many feature_maps we want to have as root (the following levels will calculate the feature_map by multiply by 2, exp, 64, 128, 256)
+        "filter_size": 3,      # filter size used in convolution
+        "pool_size": 2,        # pooling size used in max-pooling
+        "summaries": True,
+        "get_loss_dict": True,
+        "batch_size": 5,
+        "valid_size": 5,
+        'structure': 'Hydra',
+        'neck_len': 2,
+        'n_classes': 16
+    },
+    'proc_dict':{
+        'data':{},
+        'truth':{}        
+    },
+    'epochs':200,
+    'optimizer': 'adam',
+    'server': '1',
+    'GPU_IND':'3'
+}
+
+# rerun 39 with NMS
+para_str_41 = 'Idx_41-Loss_l2_masked_mid5-Loss-gradient_XY_masked_norm_NMS_w_10_invalid_end20-Reg_no-Drop_0.8-Ob_FULL_SEG_3C_motion-Gt_FULL_SEG-Hydra4_2_16'
+para_dict_41 = {
+    'idx':41,
+    'losses':[
+        {
+        'name':'l2',
+        'weight':1,
+        'mask':'mid5'},
+        {
+        'name':'edge',
+        'edge_type':'gradient',
+        'weight':10,
+        'mask':'norm',
+        'mask_before_operate':False,
+        'get_XY':True,
+        'NMS': True,
+        'NMS_window_size': 3,
+        'invalid_last':0
+        }],
+    'reg':None,
+    'Keep':0.8,
+    'Ob':'FULL_SEG_3C_motion',
+    'Gt':'FULL_SEG',
+    'kwargs' : {
+        "layers": 4,           # how many resolution levels we want to have
+        "conv_times": 2,       # how many times we want to convolve in each level
+        "features_root": 64,   # how many feature_maps we want to have as root (the following levels will calculate the feature_map by multiply by 2, exp, 64, 128, 256)
+        "filter_size": 3,      # filter size used in convolution
+        "pool_size": 2,        # pooling size used in max-pooling
+        "summaries": True,
+        "get_loss_dict": True,
+        "batch_size": 5,
+        "valid_size": 5,
+        'structure': 'Hydra',
+        'neck_len': 2,
+        'n_classes': 16
+    },
+    'proc_dict':{
+        'data':{},
+        'truth':{}        
+    },
+    'epochs':200,
+    'optimizer': 'adam',
+    'server': '1',
+    'GPU_IND':'2'
+}
+
 # para_dict_1018 = {
 #     'idx':1018,
 #     'losses':[
@@ -1153,11 +1248,12 @@ para_dict_1018 = {
 #     'GPU_IND':'2'
 # }
 
-para_dict_use = para_dict_1018
-para_str_use = para_str_1018
+para_dict_use = para_dict_41
+para_str_use = para_str_41
 
-print('Running '+ para_str_use)
-print(para_dict_use)
+import pprint
+pprint.pprint('Running '+ para_str_use)
+pprint.pprint(para_dict_use)
 
 # here indicating the GPU you want to use. if you don't have GPU, just leave it.
 gpu_ind = para_dict_use.get('GPU_IND', '3')
