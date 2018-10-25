@@ -1174,6 +1174,52 @@ para_dict_41 = {
     'GPU_IND':'2'
 }
 
+# re-run 40 with different gradient weight
+para_str_42 = 'Idx_42-Loss_l2_masked_mid5-Loss-gradient_XY_w_30-Reg_no-Drop_0.8-Ob_FULL_SEG_3C_motion-Gt_FULL_SEG-Hydra4_2_16'
+para_dict_42 = {
+    'idx':42,
+    'losses':[
+        {
+        'name':'l2',
+        'weight':1,
+        'mask':'mid5'},
+        {
+        'name':'edge',
+        'edge_type':'gradient',
+        'weight':30,
+        'mask':None,
+        'mask_before_operate':False,
+        'get_XY':True,
+        'invalid_last':0
+        }],
+    'reg':None,
+    'Keep':0.8,
+    'Ob':'FULL_SEG_3C_motion',
+    'Gt':'FULL_SEG',
+    'kwargs' : {
+        "layers": 4,           # how many resolution levels we want to have
+        "conv_times": 2,       # how many times we want to convolve in each level
+        "features_root": 64,   # how many feature_maps we want to have as root (the following levels will calculate the feature_map by multiply by 2, exp, 64, 128, 256)
+        "filter_size": 3,      # filter size used in convolution
+        "pool_size": 2,        # pooling size used in max-pooling
+        "summaries": True,
+        "get_loss_dict": True,
+        "batch_size": 5,
+        "valid_size": 5,
+        'structure': 'Hydra',
+        'neck_len': 2,
+        'n_classes': 16
+    },
+    'proc_dict':{
+        'data':{},
+        'truth':{}        
+    },
+    'epochs':200,
+    'optimizer': 'adam',
+    'server': '1',
+    'GPU_IND':'3'
+}
+
 # para_dict_1018 = {
 #     'idx':1018,
 #     'losses':[
@@ -1248,8 +1294,8 @@ para_dict_41 = {
 #     'GPU_IND':'2'
 # }
 
-para_dict_use = para_dict_41
-para_str_use = para_str_41
+para_dict_use = para_dict_42
+para_str_use = para_str_42
 
 import pprint
 pprint.pprint('Running '+ para_str_use)
