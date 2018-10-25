@@ -60,7 +60,7 @@ for gpu in os.listdir(resultPath):
     for expFolder in os.listdir(resultPath + '/' + gpu):
         if 'validation_noted' in os.listdir(resultPath + '/' + gpu + '/' + expFolder):
 #        if False:
-            # if the folder already procceed, just skip it
+            # if the folder is already procceed, just skip it
             continue
         else:
             print('PROCESSING: ' + gpu + '/' + expFolder)
@@ -109,5 +109,4 @@ for gpu in os.listdir(resultPath):
                         reconImgs_noted = notePSNR2Imgs(valCleanImgs, reconImgs)
                         reconImgs_noted.save(valNotedPath + 'epoch_{}_valid_img.png'.format(epoch))
                 else:
-                    continue
-                
+                    continue                
