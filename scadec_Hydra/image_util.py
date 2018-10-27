@@ -23,6 +23,9 @@ import glob
 import numpy as np
 from PIL import Image
 from scipy import ndimage
+import h5py
+
+from scadec_Hydra.util import verbose_print
 
 class BaseDataProvider(object):
 
@@ -54,18 +57,21 @@ class BaseDataProvider(object):
 
 class SimpleDataProvider(BaseDataProvider):
     
-    def __init__(self, data, truths, data_cls = None, data_cls_num=None, onehot_cls = False, process_dict = {}):
+    def __init__(self, data, truths, data_cls = None, data_cls_num=None, onehot_cls = False, process_dict = {}, verbose = False):
         # additional_info should be list of dicts
         super(SimpleDataProvider, self).__init__()
         # Xing
         self.data = data
         self.truths = truths
+        self.size = data.shape[0]
+        # self.truth_size = truths.shape[0]
         #self.data = np.float64(data)
         #self.truths = np.float64(truths)
         self.img_channels = self.data[0].shape[2]
         self.truth_channels = self.truths[0].shape[2]
         self.file_count = data.shape[0]
         self.process_dict = process_dict
+        print(data_cls)
         
         # data_cls should be np.array
         self.data_cls = data_cls.astype(np.int32)
@@ -75,6 +81,7 @@ class SimpleDataProvider(BaseDataProvider):
             self.data_cls_num = data_cls_num
         
         self.onehot_cls = onehot_cls
+        self.verbose = verbose
 
 
     def _next_batch(self, n):
@@ -95,7 +102,9 @@ class SimpleDataProvider(BaseDataProvider):
                 X[i] = self._process_data(self.data[idx[i]])
                 Y[i] = self._process_truths(self.truths[idx[i]])
         else:            
-
+            # verbose_print('next batch indices:'， self.verbose)
+            verbose_print('next batch indices:',self.verbose)
+            verbose_print(idx, self.verbose)
             for i in range(n):
                 X[i] = self._process_data(self.data[idx[i]])
                 Y[i] = self._process_truths(self.truths[idx[i]])
@@ -109,6 +118,8 @@ class SimpleDataProvider(BaseDataProvider):
         # print(self.onehot_cls)
         # print('np.shape(batch_cls)')
         # print(np.shape(batch_cls))
+        verbose_print('feed batch_cls in dataProvider: ',self.verbose)
+        verbose_print(batch_cls,self.verbose)
         return X, Y, batch_cls
 
     def _fix_batch(self, n):
@@ -200,4 +211,182 @@ def concat_n_images(image_mat):
             output = concat_images(output, img)
     return output
 
+def preprocess(data, channels):
+	nx = data.shape[1]
+	ny = data.shape[2]
+	return data.reshape((-1, nx, ny, channels))
+
+def h5py_mat2npy(datemat):
+    print('Loading '+datemat)
+    a = h5py.File(datemat)
+    # test=a[a.keys()[i]]
+    #test=a['train_nbm_5']
+
+    for data in a:
+        test=np.array(a[data])
+        test=test.T
+        # Chang here for croped data - Xing
+        if len(np.shape(test)) == 3:
+            nx,ny = np.shape(test)[1:]
+            chs = 1
+        elif len(np.shape(test)) == 4:
+            nx,ny, chs = np.shape(test)[1:]
+        #nx = 120
+        #ny = 120
+        test_x = np.reshape(test,[-1,nx,ny,chs])
     
+    return test_x
+
+def idx_classify(idx_array, n_classes = 8, mode='equally'):
+    """ Classify images by slice index(location), idx from 1 """
+    class_array = np.ones(np.shape(idx_array), dtype=np.int32)*(-1)
+    if mode == 'equally':
+        interval = int((idx_array.max() - idx_array.min() + 1)/n_classes)
+        for class_idx in range(n_classes):
+            idx_start = class_idx * interval + idx_array.min()
+            idx_end = (class_idx+1) * interval + idx_array.min()
+            class_array[(idx_array>=idx_start)&(idx_array<idx_end)] = class_idx
+            # print(idx_end)
+        # print((n_classes-1) * interval)        
+        return class_array
+
+    elif mode == 'equally_960':
+        interval = int((960 - 1 + 1)/n_classes)
+        for class_idx in range(n_classes):
+            idx_start = class_idx * interval + 1
+            idx_end = (class_idx+1) * interval + 1
+            class_array[(idx_array>=idx_start)&(idx_array<idx_end)] = class_idx
+        return class_array
+    elif mode == 'equally_96':
+        interval = int((96 - 1 + 1)/n_classes)
+        for class_idx in range(n_classes):
+            idx_start = class_idx * interval + 1
+            idx_end = (class_idx+1) * interval + 1
+            class_array[(idx_array>=idx_start)&(idx_array<idx_end)] = class_idx
+        return class_array
+    elif mode == 'all_zero':
+        return class_array*0
+
+    else:
+        raise ValueError('Unknown classification method: {}'.format(mode))
+
+def assign_silce_idx(total_count, binSliceStart=1, binSliceEnd=96):
+    # if       10:80 in 1:96
+    #    idx:  0:71 -> 10:80
+    binLength = binSliceEnd-binSliceStart+1
+    if total_count % binLength == 0:
+        binCount = int(total_count/binLength)
+    else:
+        raise ValueError("total_count {} and binLength {} Don't match!".format(total_count, binLength))
+    return np.array(list(range(binSliceStart, binSliceEnd+1))*binCount)
+
+# def add_additional_info_dict_list(ori_dict_list, new_info_list, key_name):
+#     if ori_dict_list == None:
+#         ori_dict_list = [{}]*len(new_info_list)
+
+#     if len(ori_dict_list) != len(new_info_list):
+#         raise ValueError("ori dict len {} and info list len {} don't match!".format(len(ori_dict_list), len(new_info_list)))
+
+#     for data_idx in range(len(ori_dict_list)):
+#         ori_dict_list[data_idx][key_name] = new_info_list[data_idx]
+#     return ori_dict_list 
+
+def get_data_provider(para_dict_use, mode = 'train', DEBUG_MODE = False):
+    data_cls_num = para_dict_use['kwargs'].get('n_classes',1)
+    if DEBUG_MODE:
+        # Observation
+        if ('3C' in para_dict_use['Ob']):
+            data_channels = 3 
+            if 'motion' in para_dict_use['Ob']:
+                if ('FULL_SEG' in para_dict_use['Ob']):            
+                    if mode == 'train':
+                        data = h5py_mat2npy('../data/train_np/traOb_FULL_SEG_neigh_motion_part_2.mat')
+                        data_cls = idx_classify(assign_silce_idx(np.shape(data)[0]),n_classes = data_cls_num, mode='equally')
+                        #data_cls = idx_classify(np.arange(100, 245+1, 5), mode='equally_960')
+                    elif mode == 'test' or mode == 'valid':
+                        data = None
+                    
+                    vdata = h5py_mat2npy('../data/valid_np/valOb_neigh_motion.mat')
+                    # vdata_cls = idx_classify(assign_silce_idx(np.shape(vdata)[0]), mode='equally_960')
+                    vdata_idx = np.arange(100, 245+1, 5)%96
+                    vdata_idx[vdata_idx==0] = 96
+                    #vdata_cls = idx_classify(np.arange(100, 245+1, 5)%96,n_classes = data_cls_num, mode='equally_96')
+                    vdata_cls = idx_classify(vdata_idx,n_classes = data_cls_num, mode='equally_96')
+                        
+
+        # Truth (Target)
+        if ('3C' in para_dict_use['Gt']):
+            truth_channels = 3
+            pass
+        else:
+            truth_channels = 1
+            if ('FULL_SEG' in para_dict_use['Gt']):
+                if mode == 'train':       
+                    # truths = h5py_mat2npy('train_np/traGt_FULL_SEG_part_1.mat')            
+                    truths = h5py_mat2npy('../data/train_np/traGt_FULL_SEG_part_2.mat')
+                    # truths = h5py_mat2npy('../data/valid_np/valGt.mat')
+                    vtruths = h5py_mat2npy('../data/valid_np/valGt.mat')
+                elif mode == 'test' or mode == 'valid':
+                    truths = None
+                    vtruths = h5py_mat2npy('../data/valid_np/valGt.mat')
+
+
+        training_iters = 50
+    else:
+        # Obeservation / input noisy data
+        if ('3C' in para_dict_use['Ob']):
+            data_channels = 3 
+            if 'motion' in para_dict_use['Ob']:
+                if ('FULL_SEG' in para_dict_use['Ob']):   
+                    if mode == 'train':         
+                        # data = h5py_mat2npy('train_np/traOb_FULL_SEG_neigh_motion_part_1.mat')
+                        data1 = h5py_mat2npy('../data/train_np/traOb_FULL_SEG_neigh_motion_part_1.mat')
+                        data2 = h5py_mat2npy('../data/train_np/traOb_FULL_SEG_neigh_motion_part_2.mat')
+                        data3 = h5py_mat2npy('../data/train_np/traOb_FULL_SEG_neigh_motion_part_3.mat')
+                        data  = np.concatenate([data1, data2, data3], axis=0)    
+                        data_cls = idx_classify(assign_silce_idx(np.shape(data)[0]), n_classes = data_cls_num, mode='equally')
+                        # print('Observation_size')
+                        # print(np.shape(data)[0])
+                        # print('data_cls (at image_utils.py): ')
+                        # print(data_cls)
+                        del(data1, data2, data3)
+                        vdata = h5py_mat2npy('../data/valid_np/valOb_neigh_motion.mat')
+                        vdata_idx = np.arange(100, 245+1, 5)%96
+                        vdata_idx[vdata_idx==0] = 96
+                        # vdata_cls = idx_classify(np.arange(100, 245+1, 5),n_classes = data_cls_num, mode='equally_96')    
+                        vdata_cls = idx_classify(vdata_idx,n_classes = data_cls_num, mode='equally_96')    
+                    elif mode == 'test' or mode == 'valid':
+                        data = None
+                        vdata = h5py_mat2npy('../data/valid_np/valOb_neigh_motion_FULL.mat')
+                        vdata_cls = idx_classify(assign_silce_idx(np.shape(vdata)[0]),n_classes = data_cls_num, mode = 'equally')
+                        # vdata_cls = idx_classify(np.arange(100, 245+1, 5), mode='equally_960')
+
+        # Ground truth / Target clean data
+        if ('3C' in para_dict_use['Gt']):
+            truth_channels = 3
+            pass
+        else:
+            truth_channels = 1
+            if ('FULL_SEG' in para_dict_use['Gt']):
+                if mode == 'train':
+                    # truths = h5py_mat2npy('train_np/traGt_FULL_SEG_part_1.mat')
+                    truths1 = h5py_mat2npy('../data/train_np/traGt_FULL_SEG_part_1.mat')
+                    truths2 = h5py_mat2npy('../data/train_np/traGt_FULL_SEG_part_2.mat')
+                    truths3 = h5py_mat2npy('../data/train_np/traGt_FULL_SEG_part_3.mat')
+                    truths  = np.concatenate([truths1, truths2, truths3], axis=0)
+                    del(truths1, truths2, truths3)                
+                    vtruths = h5py_mat2npy('../data/valid_np/valGt.mat')
+                elif mode == 'test' or mode == 'valid':
+                    truths = None
+                    vtruths = h5py_mat2npy('../data/valid_np/valGt_FULL.mat')
+
+        training_iters = 700
+        # training_iters = 50
+
+    if mode == 'train':
+        data_provider = SimpleDataProvider(data, truths, data_cls = data_cls, data_cls_num=data_cls_num, process_dict = para_dict_use['proc_dict'], onehot_cls=True, verbose=False)
+    elif mode == 'test' or mode == 'valid':
+        data_provider = None 
+    
+    valid_provider = SimpleDataProvider(vdata, vtruths, data_cls = vdata_cls, data_cls_num=data_cls_num, process_dict = para_dict_use['proc_dict'], onehot_cls=True, verbose=False)
+    return data_provider, valid_provider, data_channels, truth_channels, training_iters

@@ -325,9 +325,9 @@ class Trainer_bn(object):
         train_inputs = util.noteTexts2Imgs(train_inputs, batch_inputs_str)
         train_outputs = util.noteTexts2Imgs(train_outputs, batch_outputs_str)
         
-        util.save_img(train_inputs, "%s/%s_img.png"%(self.prediction_path, "epoch_%s_train_inputs"%epoch))
-        util.save_img(train_outputs, "%s/%s_img.png"%(self.prediction_path, "epoch_%s_train_outputs"%epoch))
-        util.save_img(train_targets, "%s/%s_img.png"%(self.prediction_path, "epoch_%s_train_targets"%epoch))
+        util.save_img(train_inputs, "%s/%s_img.tif"%(self.prediction_path, "epoch_%s_train_inputs"%epoch))
+        util.save_img(train_outputs, "%s/%s_img.tif"%(self.prediction_path, "epoch_%s_train_outputs"%epoch))
+        util.save_img(train_targets, "%s/%s_img.tif"%(self.prediction_path, "epoch_%s_train_targets"%epoch))
 
     def output_valstats(self, sess, summary_writer, step, batch_x, batch_y, batch_cls, name, current_epoch, store_img=True):
         
@@ -374,7 +374,7 @@ class Trainer_bn(object):
                 valid_outputs = util.noteTexts2Imgs(valid_outputs, batch_outputs_str)
 
                 # util.save_img(img, "%s/%s_img.tif"%(self.prediction_path, name))
-                util.save_img(valid_outputs, "%s/%s_img.png"%(self.prediction_path, name))
+                util.save_img(valid_outputs, "%s/%s_img.tif"%(self.prediction_path, name))
             
             
 

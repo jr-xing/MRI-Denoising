@@ -247,12 +247,10 @@ class Unet_bn(object):
                             typ = cost_dict.get('type', None)
                             if typ == None:
                                 loss_masked_edge = tf.losses.absolute_difference(edge_x_X, edge_y_X)+tf.losses.absolute_difference(edge_x_Y, edge_y_Y)
+                            elif typ == '1':
+                                pass
                             elif typ == '2':
-                                loss_masked_edge = tf.losses.mean_squared_error(edge_x_X, edge_y_X) + tf.losses.mean_squared_error(edge_x_Y, edge_y_Y)
-                            elif typ == '3':
-                                edge_x = tf.square(edge_x_X) + tf.square(edge_x_Y)
-                                edge_y = tf.square(edge_y_X) + tf.square(edge_y_Y)
-                                loss_masked_edge = tf.losses.mean_squared_error(edge_x, edge_y)
+                                pass
                         else:
                             edge_x = get_edge(x_masked, operator=cost_dict['edge_type'])
                             edge_y = get_edge(y_masked, operator=cost_dict['edge_type'])
