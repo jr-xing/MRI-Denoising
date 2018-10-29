@@ -124,16 +124,16 @@ class Trainer_bn(object):
             self.learning_rate_node = tf.Variable(learning_rate)
             
             update_ops_g = tf.get_collection(tf.GraphKeys.UPDATE_OPS, scope='generator')
-            print('gene vars:')
-            pprint.pprint([var for var in update_ops_g])
+            # print('gene vars:')
+            # pprint.pprint([var for var in update_ops_g])
             with tf.control_dependencies(update_ops_g):
                 g_optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate_node, 
                                                    **self.opt_kwargs).minimize(self.net.loss,
                                                                                 global_step=global_step)
             
             update_ops_d = tf.get_collection(tf.GraphKeys.UPDATE_OPS, scope='discriminator')
-            print('disc vars:')
-            pprint.pprint([var for var in update_ops_d])
+            # print('disc vars:')
+            # pprint.pprint([var for var in update_ops_d])
             with tf.control_dependencies(update_ops_d):
                 d_optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate_node, 
                                                    **self.opt_kwargs).minimize(self.net.disc_loss,
@@ -244,7 +244,7 @@ class Trainer_bn(object):
                 util.save_img(imgx, "%s/%s_img.png"%(self.prediction_path, 'trainOb'))
                 util.save_img(imgy, "%s/%s_img.png"%(self.prediction_path, 'trainGt'))
 
-            pprint.pprint([var.name for var in tf.trainable_variables()])
+            # pprint.pprint([var.name for var in tf.trainable_variables()])
             for epoch in range(epochs):
                 total_loss = 0
                 # batch_x, batch_y = data_provider(self.batch_size)
