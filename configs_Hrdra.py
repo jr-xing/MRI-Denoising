@@ -1361,8 +1361,8 @@ para_dict_48 = {
 
 #para_dict_use = para_dict_42
 #para_str_use = para_str_42
-para_dict_use_train = para_dict_48
-para_str_use_train = para_str_48
+para_dict_use_train = para_dict_47
+para_str_use_train = para_str_47
 
 para_dict_use_test = para_dict_45
 para_str_use_test = para_str_45

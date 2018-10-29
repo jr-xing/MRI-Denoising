@@ -30,6 +30,7 @@ import tensorflow as tf
 from scadec_Hydra import util
 
 from art import text2art, randart
+import pprint
 
 SHORT_INFO = False
 #from IPython.core.debugger import Tracer
@@ -122,11 +123,18 @@ class Trainer_bn(object):
             learning_rate = self.opt_kwargs.pop("learning_rate", 0.001)
             self.learning_rate_node = tf.Variable(learning_rate)
             
-            update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-            with tf.control_dependencies(update_ops):
+            update_ops_g = tf.get_collection(tf.GraphKeys.UPDATE_OPS, scope='generator')
+            print('gene vars:')
+            pprint.pprint([var for var in update_ops_g])
+            with tf.control_dependencies(update_ops_g):
                 g_optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate_node, 
                                                    **self.opt_kwargs).minimize(self.net.loss,
                                                                                 global_step=global_step)
+            
+            update_ops_d = tf.get_collection(tf.GraphKeys.UPDATE_OPS, scope='discriminator')
+            print('disc vars:')
+            pprint.pprint([var for var in update_ops_d])
+            with tf.control_dependencies(update_ops_d):
                 d_optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate_node, 
                                                    **self.opt_kwargs).minimize(self.net.disc_loss,
                                                                                 global_step=global_step)
@@ -236,6 +244,7 @@ class Trainer_bn(object):
                 util.save_img(imgx, "%s/%s_img.png"%(self.prediction_path, 'trainOb'))
                 util.save_img(imgy, "%s/%s_img.png"%(self.prediction_path, 'trainGt'))
 
+            pprint.pprint([var.name for var in tf.trainable_variables()])
             for epoch in range(epochs):
                 total_loss = 0
                 # batch_x, batch_y = data_provider(self.batch_size)
