@@ -29,6 +29,8 @@ import logging
 import tensorflow as tf
 from scadec_Hydra import util
 
+from art import text2art, randart
+
 SHORT_INFO = False
 #from IPython.core.debugger import Tracer
 #import ipdb
@@ -53,12 +55,12 @@ class Trainer_bn(object):
     def __init__(self, net, batch_size=1, optimizer="adam", opt_kwargs={}, verbose = False):
         self.net = net
         self.batch_size = batch_size
-        self.optimizer = optimizer
+        self.optimizer_type = optimizer # should be str
         self.opt_kwargs = opt_kwargs  
         self.verbose = verbose
 
     def _get_optimizer(self, training_iters, global_step):
-        if self.optimizer == "momentum":
+        if self.optimizer_type == "momentum":
             learning_rate = self.opt_kwargs.pop("learning_rate", 0.2)
             decay_rate = self.opt_kwargs.pop("decay_rate", 0.95)
             momentum = self.opt_kwargs.pop("momentum", 0.2)
@@ -74,7 +76,9 @@ class Trainer_bn(object):
                 optimizer = tf.train.MomentumOptimizer(learning_rate=self.learning_rate_node, momentum=momentum,
                                                    **self.opt_kwargs).minimize(self.net.loss,
                                                                                 global_step=global_step)
-        elif self.optimizer == "adam":
+            return optimizer
+        
+        elif self.optimizer_type == "adam":
             learning_rate = self.opt_kwargs.pop("learning_rate", 0.001)
             self.learning_rate_node = tf.Variable(learning_rate)
             
@@ -83,8 +87,9 @@ class Trainer_bn(object):
                 optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate_node, 
                                                    **self.opt_kwargs).minimize(self.net.loss,
                                                                                 global_step=global_step)
-        
-        elif self.optimizer == "adam_clip":
+            return optimizer
+
+        elif self.optimizer_type == "adam_clip":
             # Gradient clipping needs to happen after computing the gradients, but before applying them to update the model's parameters. In your example, both of those things are handled by the AdamOptimizer.minimize() method.
             # In order to clip your gradients you'll need to explicitly compute, clip, and apply them as described in this section in TensorFlow's API documentation. Specifically you'll need to substitute the call to the minimize() method with something like the following:
             # https://stackoverflow.com/questions/36498127/how-to-apply-gradient-clipping-in-tensorflow
@@ -108,14 +113,39 @@ class Trainer_bn(object):
                 gvs = optimizer_unclipped.compute_gradients(self.net.loss)
                 capped_gvs = [(ClipIfNotNone(grad), var) for grad, var in gvs]
                 optimizer = optimizer_unclipped.apply_gradients(capped_gvs, global_step=global_step)
-        return optimizer
+            
+            return optimizer
+        
+        elif self.optimizer_type == "adam_patchPerceptual":            
+            learning_rate = self.opt_kwargs.pop("learning_rate", 0.001)
+            self.learning_rate_node = tf.Variable(learning_rate)
+            
+            update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+            with tf.control_dependencies(update_ops):
+                g_optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate_node, 
+                                                   **self.opt_kwargs).minimize(self.net.loss,
+                                                                                global_step=global_step)
+                d_optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate_node, 
+                                                   **self.opt_kwargs).minimize(self.net.disc_loss,
+                                                                                global_step=global_step)
+            return g_optimizer, d_optimizer
+        
+        else:
+            raise ValueError('Unknown optimizer: %s' % self.optimizer_type)
+        
+        
         
     def _initialize(self, training_iters, output_path, restore, prediction_path):
         global_step = tf.Variable(0)
         logging.getLogger().setLevel(logging.INFO)
 
         # get optimizer
-        self.optimizer = self._get_optimizer(training_iters, global_step)
+        print("optimizer: %s" % self.optimizer_type)
+        if self.optimizer_type != "adam_patchPerceptual":
+            self.g_optimizer = self._get_optimizer(training_iters, global_step)
+            self.d_optimizer = tf.constant(tf.float32, 0)
+        else:
+            self.g_optimizer, self.d_optimizer = self._get_optimizer(training_iters, global_step)
         init = tf.global_variables_initializer()
 
         # get validation_path
@@ -193,8 +223,16 @@ class Trainer_bn(object):
             elif SAVE_MODE == 'Xiaojian':
                 imgx = util.concat_n_images(valid_x)
                 imgy = util.concat_n_images(valid_y)
-                util.save_img(imgx, "%s/%s_img.tif"%(self.prediction_path, 'trainOb'))
-                util.save_img(imgy, "%s/%s_img.tif"%(self.prediction_path, 'trainGt'))
+
+                batch_cls_str = ['cls: '+ str(clas) for clas in list(vbatch_cls.argmax(1))]
+                batch_outputs_psnr_str = ['PSNR: '+str(psnr) for psnr in list(util.computePSNRs(imgy, imgx))]
+                batch_outputs_str = list(zip(batch_outputs_psnr_str, batch_cls_str))
+                batch_targets_str = list(zip(['PSNR: Inf']*len(batch_cls_str),batch_cls_str))
+                imgx = util.noteTexts2Imgs(imgx, batch_outputs_str)
+                imgy = util.noteTexts2Imgs(imgy, batch_targets_str)
+
+                util.save_img(imgx, "%s/%s_img.png"%(self.prediction_path, 'trainOb'))
+                util.save_img(imgy, "%s/%s_img.png"%(self.prediction_path, 'trainGt'))
 
             for epoch in range(epochs):
                 total_loss = 0
@@ -209,8 +247,10 @@ class Trainer_bn(object):
                     # print('Shape of batch_cls!')
                     # print(np.shape(batch_cls))
                     # Run optimization op (backprop)
-                
-                    _, loss_dict, lr, avg_psnr, train_output = sess.run([self.optimizer,
+
+                    # _, loss_dict, lr, avg_psnr, train_output = sess.run([self.optimizer,
+                    _, _, loss_dict, lr, avg_psnr, train_output = sess.run([self.d_optimizer,
+                                                        self.g_optimizer,
                                                         self.net.loss_dict,
                                                         self.learning_rate_node, 
                                                         self.net.avg_psnr,
@@ -227,7 +267,7 @@ class Trainer_bn(object):
                     if step % display_step == 0:
                         # Changed here - Xing
                         # logging.info("Iter {:}".format(step))
-                        logging.info("Iter {:} (before training on the batch) Minibatch MSE= {:.4f}, Minibatch Avg PSNR= {:.4f}".format(step, loss, avg_psnr))
+                        logging.info("Iter {:} (before training on the batch)\tMinibatch MSE= {:.4f},\tMinibatch Avg PSNR= {:.4f}".format(step, loss, avg_psnr))
                         self.output_minibatch_stats(sess, summary_writer, step, batch_x, batch_y, batch_cls, epoch)
                         
                     total_loss += loss
@@ -248,12 +288,6 @@ class Trainer_bn(object):
                     elif SAVE_MODE == 'Xiaojian':
                         # Xiaojian's code
                         self.output_train_batch_stats(sess, epoch, batch_x, batch_y, batch_cls, epoch)
-                        # train_inputs = util.concat_n_images(batch_x)
-                        # train_outputs = util.concat_n_images(train_output)
-                        # train_targets = util.concat_n_images(batch_y)
-                        # util.save_img(train_inputs, "%s/%s_img.tif"%(self.prediction_path, "epoch_%s_train_inputs"%epoch))
-                        # util.save_img(train_outputs, "%s/%s_img.tif"%(self.prediction_path, "epoch_%s_train_outputs"%epoch))
-                        # util.save_img(train_targets, "%s/%s_img.tif"%(self.prediction_path, "epoch_%s_train_targets"%epoch))
 
                 if epoch % save_epoch == 0:
                     directory = os.path.join(output_path, "{}_cpkt/".format(step))
@@ -296,7 +330,7 @@ class Trainer_bn(object):
         if SHORT_INFO:
             logging.info("Iter {:}".format(step))
         else:
-            logging.info("Iter {:} (After training on the batch) Minibatch MSE= {:.4f}, Minibatch Avg PSNR= {:.4f}".format(step,loss,avg_psnr))
+            logging.info("Iter {:} (After training on the batch)\tMinibatch MSE= {:.4f},\tMinibatch Avg PSNR= {:.4f}".format(step,loss,avg_psnr))
 
     def output_train_batch_stats(self, sess, epoch, batch_x, batch_y, batch_cls, current_epoch):
         # Xing
@@ -320,10 +354,12 @@ class Trainer_bn(object):
         batch_outputs_psnr_str = ['PSNR: '+str(psnr) for psnr in list(util.computePSNRs(train_targets, train_outputs))]
         batch_inputs_str = list(zip(batch_inputs_psnr_str, batch_cls_str))
         batch_outputs_str = list(zip(batch_outputs_psnr_str, batch_cls_str))
+        batch_targets_str = list(zip(['PSNR: Inf']*len(batch_cls_str),batch_cls_str))
 
         # img = util.noteTexts2Imgs(img, x_cls_str)
         train_inputs = util.noteTexts2Imgs(train_inputs, batch_inputs_str)
         train_outputs = util.noteTexts2Imgs(train_outputs, batch_outputs_str)
+        train_targets = util.noteTexts2Imgs(train_targets, batch_targets_str)
         
         util.save_img(train_inputs, "%s/%s_img.png"%(self.prediction_path, "epoch_%s_train_inputs"%epoch))
         util.save_img(train_outputs, "%s/%s_img.png"%(self.prediction_path, "epoch_%s_train_outputs"%epoch))
@@ -351,7 +387,9 @@ class Trainer_bn(object):
         if SHORT_INFO:
             logging.info("Iter {:}".format(step))
         else:
-            logging.info("Validation Statistics, validation loss= {:.4f}, Avg PSNR= {:.4f}".format(loss, avg_psnr))
+            # logging.info("Validation Statistics, validation loss= {:.4f}, Avg PSNR= {:.4f}".format(loss, avg_psnr))
+            logging.info("Validation Statistics, validation loss= {:.4f}".format(loss))
+            logging.info('\n'+text2art("Avg   PSNR:   {:.4f}".format(avg_psnr)))
 
         util.save_mat(prediction, "%s/%s.mat"%(self.prediction_path, name))
 
@@ -364,11 +402,8 @@ class Trainer_bn(object):
                 valid_outputs = util.concat_n_images(prediction)
                 valid_targets = util.concat_n_images(batch_y)
 
-                #print(batch_cls)
                 batch_cls_str = ['cls: '+ str(clas) for clas in list(batch_cls.argmax(1))]
-                #print(batch_cls_str)
                 batch_outputs_psnr_str = ['PSNR: '+str(psnr) for psnr in list(util.computePSNRs(valid_targets, valid_outputs))]
-                #print(batch_outputs_psnr_str)
                 batch_outputs_str = list(zip(batch_outputs_psnr_str, batch_cls_str))
 
                 valid_outputs = util.noteTexts2Imgs(valid_outputs, batch_outputs_str)

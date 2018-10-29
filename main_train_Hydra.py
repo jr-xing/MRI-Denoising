@@ -38,7 +38,6 @@ from scadec_Hydra.train_Hydra import Trainer_bn
 # args for training
 batch_size = kwargs.get("batch_size", 5) # batch size for training
 valid_size = kwargs.get("valid_size", 5)  # batch size for validating
-optimizer = "adam"  # optimizer we want to use, 'adam' or 'momentum'
 
 # # output paths for results
 output_path = '../result/gpu' + gpu_ind + '/' + para_str_use_train + '/models'
