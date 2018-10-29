@@ -483,7 +483,7 @@ class Unet_bn(object):
             # predict_fake => 0        
             discrim_loss = tf.reduce_mean(-(tf.log(predict_real + EPS) + tf.log(1 - predict_fake + EPS)))
         
-        weight = 0.001
+        weight = 1e-4
         gen_loss_GAN = tf.reduce_mean(-tf.log(predict_fake + EPS))
         
         self.loss_dict['GAN_generator'] = gen_loss_GAN

@@ -1322,10 +1322,47 @@ para_dict_47 = {
     'GPU_IND':'3'
 }
 
+# Re-run only 3C + mid5 mask
+# l2_3C_motion_masked_reg_no_drop_0.75_FULL_data
+para_str_48 = 'Idx_48-Loss_l2_masked_mid5-Reg_no-Drop_0.75-Ob_FULL_SEG_3C_motion-Gt_FULL_SEG-Nagini'
+para_dict_48 = {
+    'idx':48,
+    'losses':[
+        {
+            'name':'l2',
+            'weight':1,
+            'mask':'mid5'}
+        ],
+    'reg':None,
+    'Keep':0.75,
+    'Ob':'FULL_SEG_3C_motion',
+    'Gt':'FULL_SEG',
+    'kwargs' : {
+        "layers": 5,           # how many resolution levels we want to have
+        "conv_times": 2,       # how many times we want to convolve in each level
+        "features_root": 64,   # how many feature_maps we want to have as root (the following levels will calculate the feature_map by multiply by 2, exp, 64, 128, 256)
+        "filter_size": 3,      # filter size used in convolution
+        "pool_size": 2,        # pooling size used in max-pooling
+        "summaries": True,
+        "get_loss_dict": True,
+        "batch_size": 5,
+        "valid_size": 5,
+        'structure': 'Nagini'
+    },
+    'proc_dict':{
+        'data':{},
+        'truth':{}        
+    },
+    'epochs':200,
+    'optimizer': 'adam',
+    'server': '2',
+    'GPU_IND':'3'
+}
+
 #para_dict_use = para_dict_42
 #para_str_use = para_str_42
-para_dict_use_train = para_dict_47
-para_str_use_train = para_str_47
+para_dict_use_train = para_dict_48
+para_str_use_train = para_str_48
 
 para_dict_use_test = para_dict_43
 para_str_use_test = para_str_43
