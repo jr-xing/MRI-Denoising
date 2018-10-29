@@ -60,6 +60,7 @@ class Trainer_bn(object):
         self.verbose = verbose
 
     def _get_optimizer(self, training_iters, global_step):
+        self.ifGAN = False
         if self.optimizer_type == "momentum":
             learning_rate = self.opt_kwargs.pop("learning_rate", 0.2)
             decay_rate = self.opt_kwargs.pop("decay_rate", 0.95)
@@ -116,7 +117,8 @@ class Trainer_bn(object):
             
             return optimizer
         
-        elif self.optimizer_type == "adam_patchPerceptual":            
+        elif self.optimizer_type == "adam_patchPerceptual":
+            self.ifGAN = True
             learning_rate = self.opt_kwargs.pop("learning_rate", 0.001)
             self.learning_rate_node = tf.Variable(learning_rate)
             
@@ -143,7 +145,7 @@ class Trainer_bn(object):
         print("optimizer: %s" % self.optimizer_type)
         if self.optimizer_type != "adam_patchPerceptual":
             self.g_optimizer = self._get_optimizer(training_iters, global_step)
-            self.d_optimizer = tf.constant(tf.float32, 0)
+            # self.d_optimizer = tf.constant(tf.float32, 0)
         else:
             self.g_optimizer, self.d_optimizer = self._get_optimizer(training_iters, global_step)
         init = tf.global_variables_initializer()
@@ -247,21 +249,33 @@ class Trainer_bn(object):
                     # print('Shape of batch_cls!')
                     # print(np.shape(batch_cls))
                     # Run optimization op (backprop)
-
-                    # _, loss_dict, lr, avg_psnr, train_output = sess.run([self.optimizer,
-                    _, _, loss_dict, lr, avg_psnr, train_output = sess.run([self.d_optimizer,
-                                                        self.g_optimizer,
-                                                        self.net.loss_dict,
-                                                        self.learning_rate_node, 
-                                                        self.net.avg_psnr,
-                                                        self.net.recons], 
-                                                        feed_dict={self.net.x: batch_x,
-                                                                    self.net.y: batch_y,
-                                                                    self.net.batch_cls: batch_cls,
-                                                                    self.net.current_epoch: epoch,
-                                                                    self.net.total_epochs: epochs,
-                                                                    self.net.keep_prob: dropout,
-                                                                    self.net.phase: True})
+                    if self.ifGAN:
+                        _, _, loss_dict, lr, avg_psnr, train_output = sess.run([self.d_optimizer,
+                                                            self.g_optimizer,
+                                                            self.net.loss_dict,
+                                                            self.learning_rate_node, 
+                                                            self.net.avg_psnr,
+                                                            self.net.recons], 
+                                                            feed_dict={self.net.x: batch_x,
+                                                                        self.net.y: batch_y,
+                                                                        self.net.batch_cls: batch_cls,
+                                                                        self.net.current_epoch: epoch,
+                                                                        self.net.total_epochs: epochs,
+                                                                        self.net.keep_prob: dropout,
+                                                                        self.net.phase: True})
+                    else:
+                        _, loss_dict, lr, avg_psnr, train_output = sess.run([self.g_optimizer,
+                                                            self.net.loss_dict,
+                                                            self.learning_rate_node, 
+                                                            self.net.avg_psnr,
+                                                            self.net.recons], 
+                                                            feed_dict={self.net.x: batch_x,
+                                                                        self.net.y: batch_y,
+                                                                        self.net.batch_cls: batch_cls,
+                                                                        self.net.current_epoch: epoch,
+                                                                        self.net.total_epochs: epochs,
+                                                                        self.net.keep_prob: dropout,
+                                                                        self.net.phase: True})
                     loss = loss_dict['total_loss']                    
                     
                     if step % display_step == 0:

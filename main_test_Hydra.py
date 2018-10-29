@@ -46,6 +46,10 @@ pathlib.Path(test_save_path).mkdir(parents=True, exist_ok=True)
 test_batch_size = 5
 test_batch_num = int(num/test_batch_size)
 
+# Average psnr for each class
+n_cls = kwargs.get('n_classes', 1)
+avg_psnr_cls = [0]*n_cls
+
 from scadec_Hydra import util
 for batchIdx in range(test_batch_num):
 
@@ -59,10 +63,15 @@ for batchIdx in range(test_batch_num):
     x = valid_x[imgIdxStart:imgIdxEnd,:,:,:]
     y = valid_y[imgIdxStart:imgIdxEnd,:,:,:]
     x_cls = batch_cls[imgIdxStart:imgIdxEnd,:]
+    x_cls_arr = [clas for clas in list(x_cls.argmax(1))]
     x_cls_str = ['cls: '+ str(clas) for clas in list(x_cls.argmax(1))]
 
     predict = net.predict(model_path = model_path, x_test = x, batch_cls = x_cls, keep_prob = 1, phase=False)
     predicts.append(predict[0:test_batch_size,:,:])
+    psnrs = util.computePSNRs(y, predict)
+    for clasIdx, clas in enumerate(x_cls_arr):
+        avg_psnr_cls[clas] += psnrs[clasIdx]
+    #total_avg_psnr += avg_psnr
 
     test_inputs = util.concat_n_images(x)    
     test_targets = util.concat_n_images(y)
@@ -83,6 +92,25 @@ for batchIdx in range(test_batch_num):
 
 predicts = np.concatenate(predicts, axis=0)
 util.save_mat(predicts, test_save_path+'/test.mat')
+
+for idx in range(len(avg_psnr_cls)):
+    avg_psnr_cls[idx] = avg_psnr_cls[idx] / (96/n_cls)
+print('PSNR for each class:')
+print(avg_psnr_cls)
+
+file = open("{}/avg_psnr.txt".format(test_save_path),"w") 
+file.write("PSNR for each class:")
+file.write(str(avg_psnr_cls))
+file.close()
+# file.write(“Hello World”) 
+# file.write(“This is our new text file”) 
+# file.write(“and this is another line.”) 
+# file.write(“Why? Because we can.”) 
+ 
+# file.close() 
+
+#avg_psnr = total_avg_psnr / test_batch_size
+#print('avg_psnr %f' % avg_psnr)
 
 
 
