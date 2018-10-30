@@ -40,10 +40,10 @@ sys.path.append(os.path.join(os.path.dirname(sys.path[0]), "./scadec/"))
 # from IPython.core.debugger import Tracer
 # import ipdb
 IFDEBUG = False
-def dprint(string):
-    global IFDEBUG
-    if IFDEBUG:
-        print(string)
+# def dprint(string):
+#     global IFDEBUG
+#     if IFDEBUG:
+#         print(string)
 
 class Unet_bn(object):
     """
@@ -63,6 +63,7 @@ class Unet_bn(object):
         self.img_channels = img_channels
         self.truth_channels = truth_channels
         self.batch_size = kwargs.get("batch_size", 5)
+        self.ifGAN = kwargs.pop('GAN', False)
 
         # placeholders for input x and y
         if x_shape != None:
@@ -95,9 +96,7 @@ class Unet_bn(object):
         elif self.structure == 'Nagini':
             self.recons = unet_decoder(self.x, self.keep_prob, self.phase, self.img_channels, self.truth_channels, **kwargs)
         else:
-            raise ValueError('Unknown Net Structure: '+self.structure)
-        # self.recons, self.dw_h_convs, _ = unet_decoder(self.x, self.keep_prob, self.phase, self.img_channels, self.truth_channels, **kwargs)
-        # self.recons = tf.reshape(unet_decoder(self.x, self.keep_prob, self.phase, self.img_channels, self.truth_channels, **kwargs),[5,160,160,3])
+            raise ValueError('Unknown Net Structure: '+self.structure)        
         
         # Additional info
         # Array Version
@@ -105,10 +104,18 @@ class Unet_bn(object):
         # one hot version
         self.batch_cls = tf.placeholder(tf.int32,[None, kwargs.get('n_classes',1)], name='batch_cls')
 
-        # Xing        
+        # Xing
         self.loss_dict = self._get_cost(cost_dict_list)
-        self.loss = self.loss_dict['total_loss']
         self.valid_loss_dict = self._get_cost(cost_dict_list)
+
+        # GAN
+        if self.ifGAN:
+            self.disc_loss = self._get_discriminator_loss()
+        else:
+            self.disc_loss = None
+        # Total loss
+        
+        self.loss = self.loss_dict['total_loss']
         self.valid_loss = self.valid_loss_dict['total_loss']
                 
         self.avg_psnr = self._get_measure('avg_psnr')
@@ -150,7 +157,7 @@ class Unet_bn(object):
         #Tracer()        
         # ddprint('_get_cost')
         dprint('Computing Cost...')
-        total_pixels = self.nx * self.ny * self.truth_channels
+        # total_pixels = self.nx * self.ny * self.truth_channels
 
         def get_mask(mode = 'default', h = 320, w = 320):
             # Generate mask
@@ -247,10 +254,12 @@ class Unet_bn(object):
                             typ = cost_dict.get('type', None)
                             if typ == None:
                                 loss_masked_edge = tf.losses.absolute_difference(edge_x_X, edge_y_X)+tf.losses.absolute_difference(edge_x_Y, edge_y_Y)
-                            elif typ == '1':
-                                pass
                             elif typ == '2':
-                                pass
+                                loss_masked_edge = tf.losses.mean_squared_error(edge_x_X, edge_y_X) + tf.losses.mean_squared_error(edge_x_Y, edge_y_Y)
+                            elif typ == '3':
+                                edge_x = tf.square(edge_x_X) + tf.square(edge_x_Y)
+                                edge_y = tf.square(edge_y_X) + tf.square(edge_y_Y)
+                                loss_masked_edge = tf.losses.mean_squared_error(edge_x, edge_y)
                         else:
                             edge_x = get_edge(x_masked, operator=cost_dict['edge_type'])
                             edge_y = get_edge(y_masked, operator=cost_dict['edge_type'])
@@ -276,6 +285,7 @@ class Unet_bn(object):
                         current_loss_name = cost_dict['edge_type']
 
                     current_loss = tf.cond(tf.less_equal(self.current_epoch, self.total_epochs-cost_dict.get('invalid_last', 0)), lambda:current_loss, lambda:0.0)
+                
                 else:
                     raise ValueError("Unknown cost function: "+cost_dict['name'])
 
@@ -317,8 +327,7 @@ class Unet_bn(object):
                 img_class_onehot = self.batch_cls[img_idx, :]
                 recon = tf.reshape(tf.dynamic_partition(self.necks, img_class_onehot, 2, name = 'part_necks')[0][0][img_idx,:,:,:],[1,320,320,self.truth_channels], name = 'reshape_recon')                  
                 y = tf.reshape(self.y[img_idx,:,:,:],[1,320,320,self.truth_channels])
-
-                # Compute Losses for this single img in batch
+                
                 loss_dict = get_losses(recon, y, cost_dict_list)                
                 
                 if self.recons == None:
@@ -400,6 +409,91 @@ class Unet_bn(object):
         # loss_dict['total_loss'] = loss
         # return loss_dict
     
+    def _get_discriminator_loss(self):
+        # CP from pix2pix
+        EPS = 1e-12
+        def discrim_conv(batch_input, out_channels, stride):
+            padded_input = tf.pad(batch_input, [[0, 0], [1, 1], [1, 1], [0, 0]], mode="CONSTANT")
+            return tf.layers.conv2d(padded_input, out_channels, kernel_size=4, strides=(stride, stride), padding="valid", kernel_initializer=tf.random_normal_initializer(0, 0.02))
+        
+        def lrelu(x, a):
+            with tf.name_scope("lrelu"):
+                # adding these together creates the leak part and linear part
+                # then cancels them out by subtracting/adding an absolute value term
+                # leak: a*x/2 - a*abs(x)/2
+                # linear: x/2 + abs(x)/2
+
+                # this block looks like it has 2 inputs on the graph unless we do this
+                x = tf.identity(x)
+                return (0.5 * (1 + a)) * x + (0.5 * (1 - a)) * tf.abs(x)
+                
+        def batchnorm(inputs):
+            return tf.layers.batch_normalization(inputs, axis=3, epsilon=1e-5, momentum=0.1, training=True, gamma_initializer=tf.random_normal_initializer(1.0, 0.02))
+
+        def create_discriminator(discrim_inputs, discrim_targets):            
+            n_layers = 3
+            ndf = 32    # number of discriminator filters in first conv layer
+            layers = []
+
+            # 2x [batch, height, width, in_channels] => [batch, height, width, in_channels * 2]
+            input = tf.concat([discrim_inputs, discrim_targets], axis=3)
+
+            # layer_1: [batch, 256, 256, in_channels * 2] => [batch, 128, 128, ndf]
+            with tf.variable_scope("layer_1"):
+                convolved = discrim_conv(input, ndf, stride=2)
+                rectified = lrelu(convolved, 0.2)
+                layers.append(rectified)
+
+            # layer_2: [batch, 128, 128, ndf] => [batch, 64, 64, ndf * 2]
+            # layer_3: [batch, 64, 64, ndf * 2] => [batch, 32, 32, ndf * 4]
+            # layer_4: [batch, 32, 32, ndf * 4] => [batch, 31, 31, ndf * 8]
+            for i in range(n_layers):
+                with tf.variable_scope("layer_%d" % (len(layers) + 1)):
+                    out_channels = ndf * min(2**(i+1), 8)
+                    stride = 1 if i == n_layers - 1 else 2  # last layer here has stride 1
+                    convolved = discrim_conv(layers[-1], out_channels, stride=stride)
+                    normalized = batchnorm(convolved)
+                    rectified = lrelu(normalized, 0.2)
+                    layers.append(rectified)
+
+            # layer_5: [batch, 31, 31, ndf * 8] => [batch, 30, 30, 1]
+            with tf.variable_scope("layer_%d" % (len(layers) + 1)):
+                convolved = discrim_conv(rectified, out_channels=1, stride=1)
+                output = tf.sigmoid(convolved)
+                layers.append(output)
+
+            return layers[-1]
+        
+        # create two copies of discriminator, one for real pairs and one for fake pairs
+        # they share the same underlying variables
+        # Discriminator take (condition, image(fake/real))
+        with tf.name_scope("real_discriminator"):
+            with tf.variable_scope("discriminator"):
+                # 2x [batch, height, width, channels] => [batch, 30, 30, 1]
+                predict_real = create_discriminator(self.x, self.y)
+
+        with tf.name_scope("fake_discriminator"):
+            with tf.variable_scope("discriminator", reuse=True):
+                # 2x [batch, height, width, channels] => [batch, 30, 30, 1]
+                predict_fake = create_discriminator(self.x, self.recons)
+
+        with tf.name_scope("discriminator_loss"):
+            # minimizing -tf.log will try to get inputs to 1
+            # predict_real => 1
+            # predict_fake => 0        
+            discrim_loss = tf.reduce_mean(-(tf.log(predict_real + EPS) + tf.log(1 - predict_fake + EPS)))
+        
+        weight = 1e-4
+        gen_loss_GAN = tf.reduce_mean(-tf.log(predict_fake + EPS))
+        
+        self.loss_dict['GAN_generator'] = gen_loss_GAN
+        self.loss_dict['total_loss'] += gen_loss_GAN * weight
+        
+        self.valid_loss_dict['GAN_generator'] = gen_loss_GAN
+        self.valid_loss_dict['total_loss'] += gen_loss_GAN * weight
+        
+        return discrim_loss
+
 
 
     # predict
@@ -428,39 +522,6 @@ class Unet_bn(object):
         
         return prediction
     
-    # def output_valstats(self, sess, summary_writer, step, batch_x, batch_y, batch_cls, name, current_epoch, store_img=True):
-            
-    #         prediction, loss_dict, avg_psnr = sess.run([self.net.recons,
-    #                                                 self.net.valid_loss_dict,
-    #                                                 self.net.valid_avg_psnr], 
-    #                                                 feed_dict={self.net.x: batch_x, 
-    #                                                             self.net.y: batch_y,
-    #                                                             self.net.batch_cls: batch_cls,
-    #                                                             self.net.current_epoch: current_epoch,
-    #                                                             self.net.total_epochs: self.total_epochs,
-    #                                                             self.net.keep_prob: 1.,
-    #                                                             self.net.phase: False})
-    #         loss = loss_dict['total_loss']
-    #         for loss_name, loss_value in loss_dict.items():
-    #             self.record_summary(summary_writer, 'valid_'+loss_name, loss_value, step)             
-            
-    #         self.record_summary(summary_writer, 'valid_avg_psnr', avg_psnr, step)
-                
-    #         # Xing
-    #         if SHORT_INFO:
-    #             logging.info("Iter {:}".format(step))
-    #         else:
-    #             logging.info("Validation Statistics, validation loss= {:.4f}, Avg PSNR= {:.4f}".format(loss, avg_psnr))
-
-    #         util.save_mat(prediction, "%s/%s.mat"%(self.prediction_path, name))
-
-    #         if store_img:
-    #             if SAVE_MODE == 'Original':
-    #                 util.save_img(prediction[0,...], "%s/%s_img.tif"%(self.prediction_path, name))
-    #             elif SAVE_MODE == 'Xiaojian':
-    #                 # Xiaojian's code
-    #                 img = util.concat_n_images(prediction)
-    #                 util.save_img(img, "%s/%s_img.tif"%(self.prediction_path, name))
 
     def save(self, sess, model_path):
         """

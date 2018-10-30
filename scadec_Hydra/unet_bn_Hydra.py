@@ -91,12 +91,20 @@ class Unet_bn(object):
         # self.recons = unet_decoder(self.x, self.keep_prob, self.phase, self.img_channels, self.truth_channels, **kwargs)
         # Xing
         self.structure = kwargs.get('structure','Hydra')
-        if self.structure == 'Hydra' or self.structure == 'HydraEr':
-            self.necks = unet_decoder(self.x, self.keep_prob, self.phase, self.img_channels, self.truth_channels, **kwargs)
-        elif self.structure == 'Nagini':
-            self.recons = unet_decoder(self.x, self.keep_prob, self.phase, self.img_channels, self.truth_channels, **kwargs)
+        if not self.ifGAN:
+            if self.structure == 'Hydra' or self.structure == 'HydraEr':
+                self.necks = unet_decoder_noGAN(self.x, self.keep_prob, self.phase, self.img_channels, self.truth_channels, **kwargs)
+            elif self.structure == 'Nagini':
+                self.recons = unet_decoder_noGAN(self.x, self.keep_prob, self.phase, self.img_channels, self.truth_channels, **kwargs)
+            else:
+                raise ValueError('Unknown Net Structure: '+self.structure)        
         else:
-            raise ValueError('Unknown Net Structure: '+self.structure)        
+            if self.structure == 'Hydra' or self.structure == 'HydraEr':
+                self.necks = unet_decoder(self.x, self.keep_prob, self.phase, self.img_channels, self.truth_channels, **kwargs)
+            elif self.structure == 'Nagini':
+                self.recons = unet_decoder(self.x, self.keep_prob, self.phase, self.img_channels, self.truth_channels, **kwargs)
+            else:
+                raise ValueError('Unknown Net Structure: '+self.structure)        
         
         # Additional info
         # Array Version
@@ -106,13 +114,15 @@ class Unet_bn(object):
 
         # Xing
         self.loss_dict = self._get_cost(cost_dict_list)
+        self.loss_no_disc = self.loss_dict['total_loss']
         self.valid_loss_dict = self._get_cost(cost_dict_list)
 
         # GAN
         if self.ifGAN:
-            self.disc_loss = self._get_discriminator_loss()
+            self.disc_loss, self.disc_loss_real = self._get_discriminator_loss()
         else:
             self.disc_loss = None
+            self.disc_loss_real = None
         # Total loss
         
         self.loss = self.loss_dict['total_loss']
@@ -431,8 +441,8 @@ class Unet_bn(object):
             return tf.layers.batch_normalization(inputs, axis=3, epsilon=1e-5, momentum=0.1, training=True, gamma_initializer=tf.random_normal_initializer(1.0, 0.02))
 
         def create_discriminator(discrim_inputs, discrim_targets):            
-            n_layers = 3
-            ndf = 64    # number of discriminator filters in first conv layer
+            n_layers = 2
+            ndf = 32    # number of discriminator filters in first conv layer
             layers = []
 
             # 2x [batch, height, width, in_channels] => [batch, height, width, in_channels * 2]
@@ -482,6 +492,7 @@ class Unet_bn(object):
             # predict_real => 1
             # predict_fake => 0        
             discrim_loss = tf.reduce_mean(-(tf.log(predict_real + EPS) + tf.log(1 - predict_fake + EPS)))
+            discrim_loss_real = tf.reduce_mean(-(tf.log(predict_real + EPS)))
         
         weight = 1e-4
         gen_loss_GAN = tf.reduce_mean(-tf.log(predict_fake + EPS))
@@ -492,7 +503,7 @@ class Unet_bn(object):
         self.valid_loss_dict['GAN_generator'] = gen_loss_GAN
         self.valid_loss_dict['total_loss'] += gen_loss_GAN * weight
         
-        return discrim_loss
+        return discrim_loss, discrim_loss_real
 
 
 

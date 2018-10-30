@@ -30,7 +30,9 @@ import tensorflow as tf
 from scadec_Hydra import util
 
 from art import text2art, randart
+from tqdm import tqdm
 import pprint
+import time
 
 SHORT_INFO = False
 #from IPython.core.debugger import Tracer
@@ -130,15 +132,22 @@ class Trainer_bn(object):
                 g_optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate_node, 
                                                    **self.opt_kwargs).minimize(self.net.loss,
                                                                                 global_step=global_step)
+                g_optimizer_no_disc = tf.train.AdamOptimizer(learning_rate=self.learning_rate_node, 
+                                                   **self.opt_kwargs).minimize(self.net.loss_no_disc,
+                                                                                global_step=global_step)
             
             update_ops_d = tf.get_collection(tf.GraphKeys.UPDATE_OPS, scope='discriminator')
             # print('disc vars:')
             # pprint.pprint([var for var in update_ops_d])
             with tf.control_dependencies(update_ops_d):
+                d_optimizer_real = tf.train.AdamOptimizer(learning_rate=self.learning_rate_node, 
+                                                   **self.opt_kwargs).minimize(self.net.disc_loss_real,
+                                                                                global_step=global_step)
                 d_optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate_node, 
                                                    **self.opt_kwargs).minimize(self.net.disc_loss,
                                                                                 global_step=global_step)
-            return g_optimizer, d_optimizer
+                
+            return g_optimizer, g_optimizer_no_disc, d_optimizer, d_optimizer_real
         
         else:
             raise ValueError('Unknown optimizer: %s' % self.optimizer_type)
@@ -155,7 +164,7 @@ class Trainer_bn(object):
             self.g_optimizer = self._get_optimizer(training_iters, global_step)
             # self.d_optimizer = tf.constant(tf.float32, 0)
         else:
-            self.g_optimizer, self.d_optimizer = self._get_optimizer(training_iters, global_step)
+            self.g_optimizer, self.g_optimizer_no_disc, self.d_optimizer, self.d_optimizer_real = self._get_optimizer(training_iters, global_step)
         init = tf.global_variables_initializer()
 
         # get validation_path
@@ -245,7 +254,29 @@ class Trainer_bn(object):
                 util.save_img(imgy, "%s/%s_img.png"%(self.prediction_path, 'trainGt'))
 
             # pprint.pprint([var.name for var in tf.trainable_variables()])
-            for epoch in range(epochs):
+            # Pre-training discrminnator
+            if self.ifGAN:
+                logging.info('Pre-training discrimintor...')
+                for preTraIdx in tqdm(range(500), ncols=75):
+                    batch_x, batch_y, batch_cls = data_provider(self.batch_size)
+                    _, _, loss_dict, lr, avg_psnr, train_output = sess.run([self.d_optimizer_real,
+                                                            self.g_optimizer_no_disc,
+                                                            self.net.loss_dict,
+                                                            self.learning_rate_node, 
+                                                            self.net.avg_psnr,
+                                                            self.net.recons], 
+                                                            feed_dict={self.net.x: batch_x,
+                                                                        self.net.y: batch_y,
+                                                                        self.net.batch_cls: batch_cls,
+                                                                        self.net.current_epoch: preTraIdx,
+                                                                        self.net.total_epochs: self.total_epochs,
+                                                                        self.net.keep_prob: dropout,
+                                                                        self.net.phase: True})
+
+
+            self.time_start = time.time()
+            self.time_last_epoch_end = self.time_start            
+            for epoch in range(self.total_epochs):
                 total_loss = 0
                 # batch_x, batch_y = data_provider(self.batch_size)
                 for step in range((epoch*training_iters), ((epoch+1)*training_iters)):
@@ -302,7 +333,7 @@ class Trainer_bn(object):
                     self.record_summary(summary_writer, 'training_avg_psnr', avg_psnr, step)
 
                 # output statistics for epoch
-                self.output_epoch_stats(epoch, total_loss, training_iters, lr)
+                self.output_epoch_stats(epoch, total_loss/training_iters, training_iters, lr)
                 self.output_valstats(sess, summary_writer, step, valid_x, valid_y, vbatch_cls, "epoch_%s_valid"%epoch, epoch, store_img=True)
                 # Xing
                 if SAVE_TRAIN_PRED:
@@ -319,7 +350,7 @@ class Trainer_bn(object):
                     #path = os.path.join(directory, "model.cpkt".format(step))      
                     path = os.path.join(directory, "model.cpkt")
                     self.net.save(sess, path)
-
+                
                 save_path = self.net.save(sess, save_path)
 
             logging.info("Optimization Finished!")
@@ -433,8 +464,16 @@ class Trainer_bn(object):
 
                 # util.save_img(img, "%s/%s_img.tif"%(self.prediction_path, name))
                 util.save_img(valid_outputs, "%s/%s_img.png"%(self.prediction_path, name))
-            
-            
+
+        time_this_epoch_end = time.time()
+        time_this_epoch = time_this_epoch_end - self.time_last_epoch_end
+        self.time_last_epoch_end = time_this_epoch_end
+
+        time_till_now = self.time_last_epoch_end - self.time_start
+        time_avg_per_epoch = time_till_now / (current_epoch + 1)
+        remaining_time_min = ((self.total_epochs - current_epoch) * time_avg_per_epoch)/60
+        logging.info('time of current epoch {:.1f}'.format(time_this_epoch/60))
+        logging.info('remaining time {:.1f}'.format(remaining_time_min))
 
     def record_summary(self, writer, name, value, step):
         summary=tf.Summary()

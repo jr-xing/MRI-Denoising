@@ -1359,10 +1359,59 @@ para_dict_48 = {
     'GPU_IND':'3'
 }
 
+# Test GAN
+para_str_49 = 'Idx_49-GAN_test'
+para_dict_49 = {
+    'idx':49,
+    'losses':[
+        {
+            'name':'l2',
+            'weight':1,
+            'mask':'mid5'},
+        {
+            'name':'edge',
+            'edge_type':'gradient',
+            'weight':30,
+            'mask':None,
+            'mask_before_operate':False,
+            'get_XY':True,
+            'type':'3',
+            'invalid_last':0
+        }],
+    'reg':None,
+    'Keep':0.8,
+    'Ob':'FULL_SEG_3C_motion',
+    'Gt':'FULL_SEG',
+    'kwargs' : {
+        "layers": 2,           # how many resolution levels we want to have
+        "conv_times": 2,       # how many times we want to convolve in each level
+        "features_root": 32,   # how many feature_maps we want to have as root (the following levels will calculate the feature_map by multiply by 2, exp, 64, 128, 256)
+        "filter_size": 3,      # filter size used in convolution
+        "pool_size": 2,        # pooling size used in max-pooling
+        "summaries": True,
+        "get_loss_dict": True,
+        "batch_size": 5,
+        "valid_size": 5,
+        'structure': 'Nagini',
+        'GAN': True,
+        'neck_len': 2,
+        'n_classes': 16
+    },
+    'proc_dict':{
+        'data':{},
+        'truth':{}        
+    },
+    'epochs':200,
+    'optimizer': 'adam_patchPerceptual',
+    'server': '1',
+    'GPU_IND':'3'
+}
+
+
 #para_dict_use = para_dict_42
 #para_str_use = para_str_42
-para_dict_use_train = para_dict_47
-para_str_use_train = para_str_47
+para_dict_use_train = para_dict_49
+para_str_use_train = para_str_49
 
-para_dict_use_test = para_dict_45
-para_str_use_test = para_str_45
+para_dict_use_test = para_dict_46
+para_str_use_test = para_str_46

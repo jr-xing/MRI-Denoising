@@ -14,7 +14,9 @@ os.environ['CUDA_VISIBLE_DEVICES'] = gpu_ind # 0,1,2,3
 
 #%% Load data
 from scadec_Hydra.image_util import get_data_provider
-data_provider, valid_provider, data_channels, truth_channels, training_iters = get_data_provider(para_dict_use_test, 'test', DEBUG_MODE=False)
+DEBUG_MODE = False
+NOTE_PSNR = False
+data_provider, valid_provider, data_channels, truth_channels, training_iters = get_data_provider(para_dict_use_test, 'test', DEBUG_MODE=DEBUG_MODE)
 
 # -----------------------------------Loss------------------------------------------------------- #
 losses_dict = para_dict_use_test['losses']
@@ -39,7 +41,11 @@ num = valid_provider.size
 predicts = []
 valid_x, valid_y, batch_cls = valid_provider('full')
 model_path =  '../result/gpu' + str(gpu_ind) + '/' + para_str_use_test + '/models/final/model.cpkt'
-test_save_path = '../result/gpu' + str(gpu_ind) + '/' + para_str_use_test + '/test'
+if DEBUG_MODE:
+    test_save_path = '../result/gpu' + str(gpu_ind) + '/' + para_str_use_test + '/test_small'
+else:
+    test_save_path = '../result/gpu' + str(gpu_ind) + '/' + para_str_use_test + '/test'
+
 import pathlib
 pathlib.Path(test_save_path).mkdir(parents=True, exist_ok=True) 
 
@@ -72,18 +78,17 @@ for batchIdx in range(test_batch_num):
     for clasIdx, clas in enumerate(x_cls_arr):
         avg_psnr_cls[clas] += psnrs[clasIdx]
     #total_avg_psnr += avg_psnr
-
     test_inputs = util.concat_n_images(x)    
     test_targets = util.concat_n_images(y)
     test_outputs = util.concat_n_images(predict)
-
-    batch_inputs_psnr_str = ['PSNR: %.3f'%psnr  for psnr in list(util.computePSNRs(test_targets, test_inputs))]
-    batch_outputs_psnr_str = ['PSNR: %.3f'%psnr for psnr in list(util.computePSNRs(test_targets, test_outputs))]
-    batch_inputs_str = list(zip(batch_inputs_psnr_str, x_cls_str))
-    batch_outputs_str = list(zip(batch_outputs_psnr_str, x_cls_str))
-    
-    test_inputs = util.noteTexts2Imgs(test_inputs, batch_inputs_str)
-    test_outputs = util.noteTexts2Imgs(test_outputs, batch_outputs_str)
+    if NOTE_PSNR:        
+        batch_inputs_psnr_str = ['PSNR: %.3f'%psnr  for psnr in list(util.computePSNRs(test_targets, test_inputs))]
+        batch_outputs_psnr_str = ['PSNR: %.3f'%psnr for psnr in list(util.computePSNRs(test_targets, test_outputs))]
+        batch_inputs_str = list(zip(batch_inputs_psnr_str, x_cls_str))
+        batch_outputs_str = list(zip(batch_outputs_psnr_str, x_cls_str))
+        
+        test_inputs = util.noteTexts2Imgs(test_inputs, batch_inputs_str)
+        test_outputs = util.noteTexts2Imgs(test_outputs, batch_outputs_str)
 
     # util.save_img(img, "%s/%s_img.tif"%(test_save_path, name))
     util.save_img(test_inputs, "{}/batch_{}_inputs_img.png".format(test_save_path, batchIdx))
