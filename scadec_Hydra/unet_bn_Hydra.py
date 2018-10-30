@@ -91,7 +91,9 @@ class Unet_bn(object):
         # self.recons = unet_decoder(self.x, self.keep_prob, self.phase, self.img_channels, self.truth_channels, **kwargs)
         # Xing
         self.structure = kwargs.get('structure','Hydra')
-        if kwargs.pop('on_GAN_net_func', False):
+        if type(self.structure) == dict:
+            self.structure = self.structure['type']
+        if kwargs.pop('no_GAN_net_func', True):
             if self.structure == 'Hydra' or self.structure == 'HydraEr':
                 self.necks = unet_decoder_noGAN(self.x, self.keep_prob, self.phase, self.img_channels, self.truth_channels, **kwargs)
             elif self.structure == 'Nagini':

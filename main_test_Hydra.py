@@ -15,7 +15,7 @@ os.environ['CUDA_VISIBLE_DEVICES'] = gpu_ind # 0,1,2,3
 #%% Load data
 from scadec_Hydra.image_util import get_data_provider
 DEBUG_MODE = False
-NOTE_PSNR = False
+NOTE_PSNR = True
 data_provider, valid_provider, data_channels, truth_channels, training_iters = get_data_provider(para_dict_use_test, 'test', DEBUG_MODE=DEBUG_MODE)
 
 # -----------------------------------Loss------------------------------------------------------- #

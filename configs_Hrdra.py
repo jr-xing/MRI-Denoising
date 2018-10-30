@@ -1347,7 +1347,10 @@ para_dict_48 = {
         "get_loss_dict": True,
         "batch_size": 5,
         "valid_size": 5,
-        'structure': 'Nagini'
+        #'structure': 'Nagini'
+        'structure':{
+                    'type':'Nagini',
+        }
     },
     'proc_dict':{
         'data':{},

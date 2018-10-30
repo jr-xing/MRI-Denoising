@@ -234,7 +234,7 @@ def get_image_summary(img, idx=0):
     return V
 
 
-def unet_decoder_noGAN(x, keep_prob, phase, img_channels, truth_channels, layers=3, conv_times=3, features_root=16, filter_size=3, pool_size=2, summaries=True, get_loss_dict = True, batch_size = 5, valid_size = 5, n_classes = 8, structure='Hydra', neck_len = 3):
+def unet_decoder_noGAN(x, keep_prob, phase, img_channels, truth_channels, layers=3, conv_times=3, features_root=16, filter_size=3, pool_size=2, summaries=True, get_loss_dict = True, batch_size = 5, valid_size = 5, structure={'type':'Nagini'}):#, n_classes = 8, structure='Hydra', neck_len = 3):
     print('------------------------')
     print('USING unet_decoder_noGAN')
     print('------------------------')
@@ -251,6 +251,10 @@ def unet_decoder_noGAN(x, keep_prob, phase, img_channels, truth_channels, layers
     :param pool_size: size of the max pooling operation
     :param summaries: Flag if summaries should be created
     """
+    structure_type = structure.get('type', 'Nagini')
+    n_classes = structure.get('n_classes', 16)    
+    neck_len = structure.get('neck_len', 3)
+    Ouroboros = structure.get('Ouroboros', True)
     
     logging.info("Layers {layers}, features {features}, filter size {filter_size}x{filter_size}, pool size: {pool_size}x{pool_size}".format(layers=layers,
                                                                                                            features=features_root,
@@ -295,7 +299,7 @@ def unet_decoder_noGAN(x, keep_prob, phase, img_channels, truth_channels, layers
     in_node = dw_h_convs[layers-1]
         
     # Up layers
-    if structure == 'HydraEr':
+    if structure_type == 'HydraEr':
         for layer in range(layers-2, -1, -1):
             dprint('uplayer {}'.format(layer))
             features = 2**(layer+1)*features_root
@@ -327,7 +331,7 @@ def unet_decoder_noGAN(x, keep_prob, phase, img_channels, truth_channels, layers
         dprint('In total {} necks'.format(len(necks)))
         dprint(in_node.shape)
                 
-    elif structure == 'Nagini' or structure == 'Hydra':
+    elif structure_type == 'Nagini' or structure_type == 'Hydra':
         for layer in range(layers-2, -1, -1):
             features = 2**(layer+1)*features_root
             with tf.variable_scope('up_layer_' + str(layer)):
@@ -347,21 +351,21 @@ def unet_decoder_noGAN(x, keep_prob, phase, img_channels, truth_channels, layers
 
         in_node = up_h_convs[0]
     else:
-        raise ValueError('Unknown Net Structure: {}'.format(structure))
+        raise ValueError('Unknown Net structure_type: {}'.format(structure_type))
 
-    if structure == 'Nagini':
+    if structure_type == 'Nagini':
         # Output with residual
         with tf.variable_scope("conv2d_1by1"):
             output = conv2d(in_node, 1, truth_channels, keep_prob, 'conv2truth_channels')
             up_h_convs["out"] = output
-    elif structure == 'HydraEr':
+    elif structure_type == 'HydraEr':
         for neck_idx in range(n_classes):
             with tf.variable_scope("conv2d_1by1_cls_{}".format(neck_idx)):
                 dprint('Processing neck {}'.format(neck_idx))
                 necks[neck_idx] = conv2d(necks[neck_idx], 1, truth_channels, keep_prob, 'conv2truth_channels')
                 up_h_convs["out"] = necks[neck_idx]
 
-    elif structure == 'Hydra':
+    elif structure_type == 'Hydra':
         # Necks - Xing        
         with tf.variable_scope("necks_"):
             neck_features = [3,5,7]
@@ -387,7 +391,7 @@ def unet_decoder_noGAN(x, keep_prob, phase, img_channels, truth_channels, layers
                 # necks[neck_idx] = neck_3
                 # necks.append(neck_3)
     else:
-        raise ValueError('Unknown Net Structure: {}'.format(structure))
+        raise ValueError('Unknown Net structure_type: {}'.format(structure_type))
     
     if summaries:
         # for i, (c1, c2) in enumerate(convs):
@@ -408,9 +412,9 @@ def unet_decoder_noGAN(x, keep_prob, phase, img_channels, truth_channels, layers
 
     # Xing
     # return output#, dw_h_convs, up_h_convs
-    if structure == 'Nagini':
+    if structure_type == 'Nagini':
         return output
-    elif structure == 'Hydra' or structure == 'HydraEr':
+    elif structure_type == 'Hydra' or structure_type == 'HydraEr':
         return necks
     else:
-        raise ValueError('Unknown Net Structure: {}'.format(structure))
+        raise ValueError('Unknown Net structure_type: {}'.format(structure_type))
