@@ -91,7 +91,7 @@ class Unet_bn(object):
         # self.recons = unet_decoder(self.x, self.keep_prob, self.phase, self.img_channels, self.truth_channels, **kwargs)
         # Xing
         self.structure = kwargs.get('structure','Hydra')
-        if not self.ifGAN:
+        if kwargs.pop('on_GAN_net_func', False):
             if self.structure == 'Hydra' or self.structure == 'HydraEr':
                 self.necks = unet_decoder_noGAN(self.x, self.keep_prob, self.phase, self.img_channels, self.truth_channels, **kwargs)
             elif self.structure == 'Nagini':
@@ -441,7 +441,7 @@ class Unet_bn(object):
             return tf.layers.batch_normalization(inputs, axis=3, epsilon=1e-5, momentum=0.1, training=True, gamma_initializer=tf.random_normal_initializer(1.0, 0.02))
 
         def create_discriminator(discrim_inputs, discrim_targets):            
-            n_layers = 2
+            n_layers = 3
             ndf = 32    # number of discriminator filters in first conv layer
             layers = []
 
