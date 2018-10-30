@@ -1386,9 +1386,9 @@ para_dict_49 = {
     'Ob':'FULL_SEG_3C_motion',
     'Gt':'FULL_SEG',
     'kwargs' : {
-        "layers": 5,           # how many resolution levels we want to have
+        "layers": 2,           # how many resolution levels we want to have
         "conv_times": 2,       # how many times we want to convolve in each level
-        "features_root": 64,   # how many feature_maps we want to have as root (the following levels will calculate the feature_map by multiply by 2, exp, 64, 128, 256)
+        "features_root": 32,   # how many feature_maps we want to have as root (the following levels will calculate the feature_map by multiply by 2, exp, 64, 128, 256)
         "filter_size": 3,      # filter size used in convolution
         "pool_size": 2,        # pooling size used in max-pooling
         "summaries": True,
@@ -1503,7 +1503,11 @@ para_dict_51 = {
             'Ouroboros':True,
             'neck_len': 2,
             'n_classes': 16
-        }
+        },
+        # 'no_GAN_net_func':True,
+        # 'structure':'Hydra',
+        # 'neck_len': 2,
+        # 'n_classes':16
     },
     'proc_dict':{
         'data':{},

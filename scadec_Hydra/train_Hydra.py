@@ -257,7 +257,7 @@ class Trainer_bn(object):
             # Pre-training discrminnator
             if self.ifGAN:
                 logging.info('Pre-training discrimintor...')
-                for preTraIdx in tqdm(range(1000), ncols=75):
+                for preTraIdx in tqdm(range(500), ncols=75):
                     batch_x, batch_y, batch_cls = data_provider(self.batch_size)
                     _, _, loss_dict, lr, avg_psnr, train_output = sess.run([self.d_optimizer_real,
                                                             self.g_optimizer_no_disc,

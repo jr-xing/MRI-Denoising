@@ -292,7 +292,12 @@ def assign_silce_idx(total_count, binSliceStart=1, binSliceEnd=96):
 #     return ori_dict_list 
 
 def get_data_provider(para_dict_use, mode = 'train', DEBUG_MODE = False):
-    data_cls_num = para_dict_use['kwargs'].get('n_classes',1)
+    # data_cls_num = para_dict_use['kwargs'].get('n_classes',1)
+    if type(para_dict_use['kwargs']['structure']) == str:
+        data_cls_num = para_dict_use['kwargs'].get('n_classes',1)
+    else:
+        data_cls_num = para_dict_use['kwargs']['structure'].get('n_classes', 1)
+    # print(data_cls_num)
     if DEBUG_MODE:
         # Observation
         if ('3C' in para_dict_use['Ob']):
