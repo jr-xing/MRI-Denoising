@@ -1684,7 +1684,7 @@ para_dict_54 = {
 }
 
 # re-run 51 with different structure
-para_str_55 = 'Idx_51-Loss_l2_masked_mid5-Loss_gradient_type_3_w_100-Reg_no-Drop_0.8-Ob_FULL_SEG_3C_motion-Gt_FULL_SEG-Hydra3_3_16_Ouroboros'
+para_str_55 = 'Idx_55-Loss_l2_masked_mid5-Loss_gradient_type_3_w_100-Reg_no-Drop_0.8-Ob_FULL_SEG_3C_motion-Gt_FULL_SEG-Hydra3_3_16_Ouroboros'
 para_dict_55 = {
     'idx':55,
     'losses':[
