@@ -1260,6 +1260,7 @@ para_dict_46 = {
         "get_loss_dict": True,
         "batch_size": 5,
         "valid_size": 5,
+        'no_GAN_net_func':True,
         'structure': 'Hydra',
         'neck_len': 2,
         'n_classes': 16
@@ -1519,10 +1520,229 @@ para_dict_51 = {
     'GPU_IND':'3'
 }
 
+# re-run ?(masked l2 and gradient) with smaller network
+para_str_52 = 'Idx_52-Loss_l2_masked_mid5-Loss_gradient_type_3_w_50-Reg_no-Drop_0.8-Ob_FULL_SEG_3C_motion-Gt_FULL_SEG-Nagini_Ouroboros'
+para_dict_52 = {
+    'idx':52,
+    'losses':[
+        {
+        'name':'l2',
+        'weight':1,
+        'mask':'mid5'},
+        {
+        'name':'edge',
+        'edge_type':'gradient',
+        'weight':50,
+        'mask':None,
+        'mask_before_operate':False,
+        'get_XY':True,
+	    'type':'3',
+        'invalid_last':0
+        }],
+    'reg':None,
+    'Keep':0.8,
+    'Ob':'FULL_SEG_3C_motion',
+    'Gt':'FULL_SEG',
+    'kwargs' : {
+        "layers": 4,           # how many resolution levels we want to have
+        "conv_times": 2,       # how many times we want to convolve in each level
+        "features_root": 32,   # how many feature_maps we want to have as root (the following levels will calculate the feature_map by multiply by 2, exp, 64, 128, 256)
+        "filter_size": 5,      # filter size used in convolution
+        "pool_size": 2,        # pooling size used in max-pooling
+        "summaries": True,
+        "get_loss_dict": True,
+        "batch_size": 5,
+        "valid_size": 5,
+        'structure':{
+            'type':'Nagini',
+            'GAN':False,
+            'Ouroboros':True,
+        },
+    },
+    'proc_dict':{
+        'data':{},
+        'truth':{}        
+    },
+    'epochs':200,
+    'optimizer': 'adam',
+    'server': '1',
+    'GPU_IND':'3'
+}
+# result: strangely grey. 
+
+# K-space l2 loss
+para_str_53 = 'Idx_53-Loss_l2_masked_mid5-Loss_kl2_w10_Loss_gradient_type_3_w_50-Reg_no-Drop_0.8-Ob_FULL_SEG_3C_motion-Gt_FULL_SEG-Hydra4_2_16'
+para_dict_53 = {
+    'idx':53,
+    'losses':[
+        {
+            'name':'l2',
+            'weight':1,
+            'mask':'mid5'
+        },
+        {
+            'name':'edge',
+            'edge_type':'gradient',
+            'weight':50,
+            'mask':None,
+            'mask_before_operate':False,
+            'get_XY':True,
+            'type':'3',
+            'invalid_last':0
+        },{
+            'name':'kl2',
+            'weight':10
+        }
+        ],
+    'reg':None,
+    'Keep':0.8,
+    'Ob':'FULL_SEG_3C_motion',
+    'Gt':'FULL_SEG',
+    'kwargs' : {
+        "layers": 4,           # how many resolution levels we want to have
+        "conv_times": 2,       # how many times we want to convolve in each level
+        "features_root": 32,   # how many feature_maps we want to have as root (the following levels will calculate the feature_map by multiply by 2, exp, 64, 128, 256)
+        "filter_size": 5,      # filter size used in convolution
+        "pool_size": 2,        # pooling size used in max-pooling
+        "summaries": True,
+        "get_loss_dict": True,
+        "batch_size": 5,
+        "valid_size": 5,
+        'structure':{
+            'type':'Hydra',
+            'GAN':False,
+            'Ouroboros':False,
+            'neck_len': 2,
+            'n_classes': 16
+        },
+    },
+    'proc_dict':{
+        'data':{},
+        'truth':{}        
+    },
+    'epochs':200,
+    'optimizer': 'adam',
+    'server': '1',
+    'GPU_IND':'2'
+}
+
+# re-run 53 with high pass in k-space
+para_str_54 = 'Idx_54-Loss_l2_masked_mid5-Loss_kl2_w_10_mask_GaussianHighPass_Loss_gradient_type_3_w_50-Reg_no-Drop_0.8-Ob_FULL_SEG_3C_motion-Gt_FULL_SEG-Hydra4_2_16'
+para_dict_54 = {
+    'idx':54,
+    'losses':[
+        {
+            'name':'l2',
+            'weight':1,
+            'mask':'mid5'
+        },
+        {
+            'name':'edge',
+            'edge_type':'gradient',
+            'weight':50,
+            'mask':None,
+            'mask_before_operate':False,
+            'get_XY':True,
+            'type':'3',
+            'invalid_last':0
+        },{
+            'name':'kl2',
+            'weight':10,
+            'mask':'GaussianHighPass'
+        }
+        ],
+    'reg':None,
+    'Keep':0.8,
+    'Ob':'FULL_SEG_3C_motion',
+    'Gt':'FULL_SEG',
+    'kwargs' : {
+        "layers": 4,           # how many resolution levels we want to have
+        "conv_times": 2,       # how many times we want to convolve in each level
+        "features_root": 32,   # how many feature_maps we want to have as root (the following levels will calculate the feature_map by multiply by 2, exp, 64, 128, 256)
+        "filter_size": 5,      # filter size used in convolution
+        "pool_size": 2,        # pooling size used in max-pooling
+        "summaries": True,
+        "get_loss_dict": True,
+        "batch_size": 5,
+        "valid_size": 5,
+        'structure':{
+            'type':'Hydra',
+            'GAN':False,
+            'Ouroboros':False,
+            'neck_len': 2,
+            'n_classes': 16
+        },
+    },
+    'proc_dict':{
+        'data':{},
+        'truth':{}        
+    },
+    'epochs':200,
+    'optimizer': 'adam',
+    'server': '1',
+    'GPU_IND':'3'
+}
+
+# re-run 51 with different structure
+para_str_55 = 'Idx_51-Loss_l2_masked_mid5-Loss_gradient_type_3_w_100-Reg_no-Drop_0.8-Ob_FULL_SEG_3C_motion-Gt_FULL_SEG-Hydra3_3_16_Ouroboros'
+para_dict_55 = {
+    'idx':55,
+    'losses':[
+        {
+        'name':'l2',
+        'weight':1,
+        'mask':'mid5'},
+        {
+        'name':'edge',
+        'edge_type':'gradient',
+        'weight':100,
+        'mask':None,
+        'mask_before_operate':False,
+        'get_XY':True,
+	    'type':'3',
+        'invalid_last':0
+        }],
+    'reg':None,
+    'Keep':0.8,
+    'Ob':'FULL_SEG_3C_motion',
+    'Gt':'FULL_SEG',
+    'kwargs' : {
+        "layers": 3,           # how many resolution levels we want to have
+        "conv_times": 2,       # how many times we want to convolve in each level
+        "features_root": 64,   # how many feature_maps we want to have as root (the following levels will calculate the feature_map by multiply by 2, exp, 64, 128, 256)
+        "filter_size": 3,      # filter size used in convolution
+        "pool_size": 2,        # pooling size used in max-pooling
+        "summaries": True,
+        "get_loss_dict": True,
+        "batch_size": 5,
+        "valid_size": 5,
+        'structure':{
+            'type':'Hydra',
+            'GAN':False,
+            'Ouroboros':True,
+            'neck_len': 3,
+            'n_classes': 16
+        },
+        # 'no_GAN_net_func':True,
+        # 'structure':'Hydra',
+        # 'neck_len': 2,
+        # 'n_classes':16
+    },
+    'proc_dict':{
+        'data':{},
+        'truth':{}        
+    },
+    'epochs':200,
+    'optimizer': 'adam',
+    'server': '2',
+    'GPU_IND':'3'
+}
+
+
 #para_dict_use = para_dict_42
 #para_str_use = para_str_42
-para_dict_use_train = para_dict_51
-para_str_use_train = para_str_51
+para_dict_use_train = para_dict_54
+para_str_use_train = para_str_54
 
-para_dict_use_test = para_dict_48
-para_str_use_test = para_str_48
+para_dict_use_test = para_dict_46
+para_str_use_test = para_str_46

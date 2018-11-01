@@ -365,6 +365,15 @@ def get_data_provider(para_dict_use, mode = 'train', DEBUG_MODE = False):
                         vdata = h5py_mat2npy('../data/valid_np/valOb_neigh_motion_FULL.mat')
                         vdata_cls = idx_classify(assign_silce_idx(np.shape(vdata)[0]),n_classes = data_cls_num, mode = 'equally')
                         # vdata_cls = idx_classify(np.arange(100, 245+1, 5), mode='equally_960')
+                    elif mode == 'test_on_train':
+                        data=None
+                        vdata = h5py_mat2npy('../data/train_np/traOb_FULL_SEG_neigh_motion_part_1.mat')[np.arange(99,245,5),:,:,:]
+                        # idx = np.arange(99,245,5)                        
+                        vdata_idx = np.arange(100, 245+1, 5)%96
+                        vdata_idx[vdata_idx==0] = 96
+                        # vdata_cls = idx_classify(np.arange(100, 245+1, 5),n_classes = data_cls_num, mode='equally_96')    
+                        vdata_cls = idx_classify(vdata_idx,n_classes = data_cls_num, mode='equally_96')    
+                        # vdata_cls = idx_classify(assign_silce_idx(np.shape(vdata)[0]),n_classes = data_cls_num, mode = 'equally')
 
         # Ground truth / Target clean data
         if ('3C' in para_dict_use['Gt']):
@@ -384,14 +393,18 @@ def get_data_provider(para_dict_use, mode = 'train', DEBUG_MODE = False):
                 elif mode == 'test' or mode == 'valid':
                     truths = None
                     vtruths = h5py_mat2npy('../data/valid_np/valGt_FULL.mat')
+                elif mode == 'test_on_train':
+                    vtruths = h5py_mat2npy('../data/train_np/traGt_FULL_SEG_part_1.mat')[np.arange(99,245,5),:,:,:]                    
 
         training_iters = 700
         # training_iters = 50
 
     if mode == 'train':
         data_provider = SimpleDataProvider(data, truths, data_cls = data_cls, data_cls_num=data_cls_num, process_dict = para_dict_use['proc_dict'], onehot_cls=True, verbose=False)
-    elif mode == 'test' or mode == 'valid':
+    elif mode == 'test' or mode == 'valid' or mode == 'test_on_train':
         data_provider = None 
+    else:
+        raise ValueError('Unknow mode' + mode)
     
     valid_provider = SimpleDataProvider(vdata, vtruths, data_cls = vdata_cls, data_cls_num=data_cls_num, process_dict = para_dict_use['proc_dict'], onehot_cls=True, verbose=False)
     return data_provider, valid_provider, data_channels, truth_channels, training_iters

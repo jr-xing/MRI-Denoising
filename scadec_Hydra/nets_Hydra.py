@@ -46,6 +46,7 @@ def unet_decoder(x, keep_prob, phase, img_channels, truth_channels, layers=3, co
     n_classes = structure.get('n_classes', 16)    
     neck_len = structure.get('neck_len', 3)
     Ouroboros = structure.get('Ouroboros', True)
+    # Ouroboros2 = structure.get('Ouroboros2', True)
     
     with tf.variable_scope('geneator'):
         # Placeholder for the input image
@@ -234,8 +235,8 @@ def get_image_summary(img, idx=0):
     return V
 
 
-def unet_decoder_noGAN(x, keep_prob, phase, img_channels, truth_channels, layers=3, conv_times=3, features_root=16, filter_size=3, pool_size=2, summaries=True, get_loss_dict = True, batch_size = 5, valid_size = 5,structure={'type':'Nagini'}):#, n_classes = 8, structure='Hydra', neck_len = 3):
-# def unet_decoder_noGAN(x, keep_prob, phase, img_channels, truth_channels, layers=3, conv_times=3, features_root=16, filter_size=3, pool_size=2, summaries=True, get_loss_dict = True, batch_size = 5, valid_size = 5, n_classes = 8, structure='Hydra', neck_len = 3):
+# def unet_decoder_noGAN(x, keep_prob, phase, img_channels, truth_channels, layers=3, conv_times=3, features_root=16, filter_size=3, pool_size=2, summaries=True, get_loss_dict = True, batch_size = 5, valid_size = 5,structure={'type':'Nagini'}):#, n_classes = 8, structure='Hydra', neck_len = 3):
+def unet_decoder_noGAN(x, keep_prob, phase, img_channels, truth_channels, layers=3, conv_times=3, features_root=16, filter_size=3, pool_size=2, summaries=True, get_loss_dict = True, batch_size = 5, valid_size = 5, n_classes = 8, structure='Hydra', neck_len = 3):
     print('------------------------')
     print('USING unet_decoder_noGAN')
     print('------------------------')
@@ -252,15 +253,15 @@ def unet_decoder_noGAN(x, keep_prob, phase, img_channels, truth_channels, layers
     :param pool_size: size of the max pooling operation
     :param summaries: Flag if summaries should be created
     """
-    structure_type = structure.get('type', 'Nagini')
-    n_classes = structure.get('n_classes', 16)    
-    neck_len = structure.get('neck_len', 3)
-    Ouroboros = structure.get('Ouroboros', True)
+    # structure_type = structure.get('type', 'Nagini')
+    # n_classes = structure.get('n_classes', 16)    
+    # neck_len = structure.get('neck_len', 3)
+    # Ouroboros = structure.get('Ouroboros', True)
     # print(structure_type)
     # print(n_classes)
     # print(neck_len)
     # print(Ouroboros)
-    # structure_type = structure
+    structure_type = structure
     
     logging.info("Layers {layers}, features {features}, filter size {filter_size}x{filter_size}, pool size: {pool_size}x{pool_size}".format(layers=layers,
                                                                                                            features=features_root,

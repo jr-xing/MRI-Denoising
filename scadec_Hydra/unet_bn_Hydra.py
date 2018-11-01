@@ -176,7 +176,7 @@ class Unet_bn(object):
         dprint('Computing Cost...')
         # total_pixels = self.nx * self.ny * self.truth_channels
 
-        def get_mask(mode = 'default', h = 320, w = 320):
+        def get_mask(mode = 'default', h = 320, w = 320, paras = {}):
             # Generate mask
             if mode == None:
                 return np.float32(np.ones([w, h, 1]))                
@@ -192,14 +192,18 @@ class Unet_bn(object):
                 return mask
             elif mode == 'norm':
                 from scipy.stats import norm
-                scaleX = 1.2
-                scaleY = 0.8
+                scaleX = paras.get('scaleX', 1.2)
+                scaleY = paras.get('scaleY', 0.8)
                 normX = np.linspace(norm.ppf(0.001, scale=scaleX),norm.ppf(0.999,scale=scaleX), w)
                 normY = np.linspace(norm.ppf(0.001, scale=scaleY),norm.ppf(0.999,scale=scaleY), h)
                 normXX, normYY = np.meshgrid(normX, normY)
                 maskN = norm.pdf(np.abs(normXX)+np.abs(normYY))
                 maskN = (maskN-np.min(maskN))/np.max(maskN)
-                return np.float32(np.reshape(maskN,[w,h,1]))        
+                return np.float32(np.reshape(maskN,[w,h,1]))     
+            elif mode == 'GaussianHighPass':
+                normMask = get_mask('norm', h, w)
+                return 1 - normMask
+
 
         def non_max_suppression(input, window_size = 3):
             # From: https://stackoverflow.com/questions/42879109/tensorflow-non-maximum-suppression
@@ -280,10 +284,7 @@ class Unet_bn(object):
                         else:
                             edge_x = get_edge(x_masked, operator=cost_dict['edge_type'])
                             edge_y = get_edge(y_masked, operator=cost_dict['edge_type'])
-                            loss_masked_edge = tf.losses.mean_squared_error(edge_x, edge_y)   
-                        
-
-
+                            loss_masked_edge = tf.losses.mean_squared_error(edge_x, edge_y)                           
                         # Loss
                         current_loss = loss_masked_edge
                         current_loss_name = cost_dict['edge_type']
@@ -302,6 +303,15 @@ class Unet_bn(object):
                         current_loss_name = cost_dict['edge_type']
 
                     current_loss = tf.cond(tf.less_equal(self.current_epoch, self.total_epochs-cost_dict.get('invalid_last', 0)), lambda:current_loss, lambda:0.0)
+                
+                elif cost_dict['name'] == 'kl2':
+                    mask = get_mask(mode=cost_dict.get('mask',None),h=320,w=320)
+                    x_fft = tf.multiply(tf.fft2d(tf.cast(x,tf.complex64)), mask)
+                    y_fft = tf.multiply(tf.fft2d(tf.cast(y,tf.complex64)), mask)
+                    # loss_kl2 = tf.losses.mean_squared_error(x_fft.real, y_fft.real) + tf.losses.mean_squared_error(x_fft.imag, y_fft.imag)
+                    loss_kl2 = tf.losses.mean_squared_error(tf.real(x_fft), tf.real(y_fft)) + tf.losses.mean_squared_error(tf.imag(x_fft), tf.imag(y_fft))
+                    current_loss = loss_kl2
+                    current_loss_name = cost_dict['name']
                 
                 else:
                     raise ValueError("Unknown cost function: "+cost_dict['name'])

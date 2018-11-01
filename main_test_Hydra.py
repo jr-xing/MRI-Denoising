@@ -9,14 +9,15 @@ pprint.pprint(para_dict_use_test)
 
 # here indicating the GPU you want to use. if you don't have GPU, just leave it.
 gpu_ind = para_dict_use_test.get('GPU_IND', '3')
-os.environ['CUDA_VISIBLE_DEVICES'] = gpu_ind # 0,1,2,3
-# os.environ['CUDA_VISIBLE_DEVICES'] = '1' # 0,1,2,3
+# os.environ['CUDA_VISIBLE_DEVICES'] = gpu_ind # 0,1,2,3
+os.environ['CUDA_VISIBLE_DEVICES'] = '1' # 0,1,2,3
 
 #%% Load data
 from scadec_Hydra.image_util import get_data_provider
 DEBUG_MODE = False
-NOTE_PSNR = True
-data_provider, valid_provider, data_channels, truth_channels, training_iters = get_data_provider(para_dict_use_test, 'test', DEBUG_MODE=DEBUG_MODE)
+NOTE_PSNR = False
+TEST_ON_TRAIN = True
+data_provider, valid_provider, data_channels, truth_channels, training_iters = get_data_provider(para_dict_use_test, 'test_on_train', DEBUG_MODE=DEBUG_MODE)
 
 # -----------------------------------Loss------------------------------------------------------- #
 losses_dict = para_dict_use_test['losses']
@@ -41,10 +42,20 @@ num = valid_provider.size
 predicts = []
 valid_x, valid_y, batch_cls = valid_provider('full')
 model_path =  '../result/gpu' + str(gpu_ind) + '/' + para_str_use_test + '/models/final/model.cpkt'
+
 if DEBUG_MODE:
-    test_save_path = '../result/gpu' + str(gpu_ind) + '/' + para_str_use_test + '/test_small'
+    folder = '/test_small'
 else:
-    test_save_path = '../result/gpu' + str(gpu_ind) + '/' + para_str_use_test + '/test'
+    if TEST_ON_TRAIN:
+        folder = '/test_on_train'
+    else:
+        folder = '/test'
+if NOTE_PSNR:
+    folder += '_noted'
+
+test_save_path = '../result/gpu' + str(gpu_ind) + '/' + para_str_use_test + folder
+
+
 
 import pathlib
 pathlib.Path(test_save_path).mkdir(parents=True, exist_ok=True) 
