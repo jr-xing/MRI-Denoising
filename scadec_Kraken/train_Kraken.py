@@ -27,7 +27,7 @@ from collections import OrderedDict
 import logging
 
 import tensorflow as tf
-from scadec_Hydra import util
+from scadec_Kraken import util
 
 from art import text2art, randart
 from tqdm import tqdm
@@ -159,7 +159,7 @@ class Trainer_bn(object):
         logging.getLogger().setLevel(logging.INFO)
 
         # get optimizer
-        # print("optimizer: %s" % self.optimizer_type)
+        print("optimizer: %s" % self.optimizer_type)
         if self.optimizer_type != "adam_patchPerceptual":
             self.g_optimizer = self._get_optimizer(training_iters, global_step)
             # self.d_optimizer = tf.constant(tf.float32, 0)
@@ -389,8 +389,18 @@ class Trainer_bn(object):
     def output_train_batch_stats(self, sess, epoch, batch_x, batch_y, batch_cls, current_epoch):
         # Xing
         # Calculate batch loss and accuracy
-        loss, predictions, avg_psnr = sess.run([self.net.loss,  
+        loss, \
+        batch_xLP, batch_xHP, \
+        batch_yLP, batch_yHP, \
+        predictions, predictions_LP, predictions_HP, \
+        avg_psnr = sess.run([self.net.loss,  
+                                                self.net.xLowPass,
+                                                self.net.xHighPass,
+                                                self.net.yLowPass,
+                                                self.net.yHighPass,
                                                 self.net.recons,
+                                                self.net.recons_lowPass,
+                                                self.net.recons_highPass,
                                                 self.net.avg_psnr], 
                                                 feed_dict={self.net.x: batch_x,
                                                             self.net.y: batch_y,
@@ -400,8 +410,14 @@ class Trainer_bn(object):
                                                             self.net.keep_prob: 1.,
                                                             self.net.phase: False})        
         train_inputs = util.concat_n_images(batch_x)
+        train_inputs_LP = util.concat_n_images(batch_xLP)
+        train_inputs_HP = util.concat_n_images(batch_xHP)
         train_outputs = util.concat_n_images(predictions)
+        train_outputs_LP = util.concat_n_images(predictions_LP)
+        train_outputs_HP = util.concat_n_images(predictions_HP)
         train_targets = util.concat_n_images(batch_y)
+        train_targets_LP = util.concat_n_images(batch_yLP)
+        train_targets_HP = util.concat_n_images(batch_yHP)
         
         batch_cls_str = ['cls: '+ str(clas) for clas in list(batch_cls.argmax(1))]
         batch_inputs_psnr_str = ['PSNR: '+str(psnr)  for psnr in list(util.computePSNRs(train_targets, train_inputs))]
@@ -416,12 +432,27 @@ class Trainer_bn(object):
         train_targets = util.noteTexts2Imgs(train_targets, batch_targets_str)
         
         util.save_img(train_inputs, "%s/%s_img.png"%(self.prediction_path, "epoch_%s_train_inputs"%epoch))
+        util.save_img(train_inputs_LP, "%s/%s_img_LP.png"%(self.prediction_path, "epoch_%s_train_inputs"%epoch))
+        util.save_img(train_inputs_HP, "%s/%s_img_HP.png"%(self.prediction_path, "epoch_%s_train_inputs"%epoch))
         util.save_img(train_outputs, "%s/%s_img.png"%(self.prediction_path, "epoch_%s_train_outputs"%epoch))
+        util.save_img(train_outputs_LP, "%s/%s_img_LP.png"%(self.prediction_path, "epoch_%s_train_outputs"%epoch))
+        util.save_img(train_outputs_HP, "%s/%s_img_HP.png"%(self.prediction_path, "epoch_%s_train_outputs"%epoch))
         util.save_img(train_targets, "%s/%s_img.png"%(self.prediction_path, "epoch_%s_train_targets"%epoch))
+        util.save_img(train_targets_LP, "%s/%s_img_LP.png"%(self.prediction_path, "epoch_%s_train_targets"%epoch))
+        util.save_img(train_targets_HP, "%s/%s_img_HP.png"%(self.prediction_path, "epoch_%s_train_targets"%epoch))
 
-    def output_valstats(self, sess, summary_writer, step, batch_x, batch_y, batch_cls, name, current_epoch, store_img=True):
-        
-        prediction, loss_dict, avg_psnr = sess.run([self.net.recons,
+    def output_valstats(self, sess, summary_writer, step, batch_x, batch_y, batch_cls, name, current_epoch, store_img=True):        
+        batch_xLP, batch_xHP, \
+        batch_yLP, batch_yHP, \
+        prediction, prediction_LP, prediction_HP, \
+        loss_dict, avg_psnr = sess.run([
+                                                self.net.xLowPass,
+                                                self.net.xHighPass,
+                                                self.net.yLowPass,
+                                                self.net.yHighPass,
+                                                self.net.recons,
+                                                self.net.recons_lowPass,
+                                                self.net.recons_highPass,
                                                 self.net.valid_loss_dict,
                                                 self.net.valid_avg_psnr], 
                                                 feed_dict={self.net.x: batch_x, 
@@ -453,8 +484,14 @@ class Trainer_bn(object):
             elif SAVE_MODE == 'Xiaojian':
                 # Xiaojian's code
                 # img = util.concat_n_images(prediction)
+                valid_inputs_LP = util.concat_n_images(batch_xLP)
+                valid_inputs_HP = util.concat_n_images(batch_xHP)
                 valid_outputs = util.concat_n_images(prediction)
+                valid_outputs_LP = util.concat_n_images(prediction_LP)
+                valid_outputs_HP = util.concat_n_images(prediction_HP)
                 valid_targets = util.concat_n_images(batch_y)
+                valid_targets_LP = util.concat_n_images(batch_yLP)
+                valid_targets_HP = util.concat_n_images(batch_yHP)
 
                 batch_cls_str = ['cls: '+ str(clas) for clas in list(batch_cls.argmax(1))]
                 batch_outputs_psnr_str = ['PSNR: '+str(psnr) for psnr in list(util.computePSNRs(valid_targets, valid_outputs))]
@@ -463,7 +500,13 @@ class Trainer_bn(object):
                 valid_outputs = util.noteTexts2Imgs(valid_outputs, batch_outputs_str)
 
                 # util.save_img(img, "%s/%s_img.tif"%(self.prediction_path, name))
+                util.save_img(valid_inputs_LP, "%s/%s_img_inputs_LP.png"%(self.prediction_path, name))
+                util.save_img(valid_inputs_HP, "%s/%s_img_inputs_HP.png"%(self.prediction_path, name))
                 util.save_img(valid_outputs, "%s/%s_img.png"%(self.prediction_path, name))
+                util.save_img(valid_outputs_LP, "%s/%s_img_LP.png"%(self.prediction_path, name))
+                util.save_img(valid_outputs_HP, "%s/%s_img_HP.png"%(self.prediction_path, name))
+                util.save_img(valid_targets_LP, "%s/%s_img_targets_LP.png"%(self.prediction_path, name))
+                util.save_img(valid_targets_HP, "%s/%s_img_targets_HP.png"%(self.prediction_path, name))
 
         time_this_epoch_end = time.time()
         time_this_epoch = time_this_epoch_end - self.time_last_epoch_end

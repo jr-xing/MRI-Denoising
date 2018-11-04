@@ -25,7 +25,7 @@ from PIL import Image
 from scipy import ndimage
 import h5py
 
-from scadec_Hydra.util import verbose_print
+from scadec_Kraken.util import verbose_print
 
 class BaseDataProvider(object):
 
@@ -71,7 +71,7 @@ class SimpleDataProvider(BaseDataProvider):
         self.truth_channels = self.truths[0].shape[2]
         self.file_count = data.shape[0]
         self.process_dict = process_dict
-        # print(data_cls)
+        print(data_cls)
         
         # data_cls should be np.array
         self.data_cls = data_cls.astype(np.int32)
@@ -293,10 +293,12 @@ def assign_silce_idx(total_count, binSliceStart=1, binSliceEnd=96):
 
 def get_data_provider(para_dict_use, mode = 'train', DEBUG_MODE = False):
     # data_cls_num = para_dict_use['kwargs'].get('n_classes',1)
-    if type(para_dict_use['kwargs']['structure']) == str:
-        data_cls_num = para_dict_use['kwargs'].get('n_classes',1)
-    else:
-        data_cls_num = para_dict_use['kwargs']['structure'].get('n_classes', 1)
+    # if type(para_dict_use['kwargs']['structure']) == str:
+    #     data_cls_num = para_dict_use['kwargs'].get('n_classes',1)
+    # else:
+    #     data_cls_num = para_dict_use['kwargs']['structure'].get('n_classes', 1)
+    # Kraken change
+    data_cls_num = 1
     # print(data_cls_num)
     if DEBUG_MODE:
         # Observation
@@ -398,32 +400,6 @@ def get_data_provider(para_dict_use, mode = 'train', DEBUG_MODE = False):
 
         training_iters = 700
         # training_iters = 50
-    ignore_classes = para_dict_use.get('ignore_classes', [])
-    # def find_min_empty_cls(cls_array, startCls = 0):
-    #     currentCls = startCls
-    #     while np.sum(cls_array[cls_array==currentCls]) != 0:
-    #         currentCls += 1
-    #     return currentCls
-
-    # print(vdata_cls)
-    for idx, ignore_class in enumerate(ignore_classes):
-        ignore_class -= idx
-        data = data[data_cls != ignore_class,:,:,:]
-        vdata = vdata[vdata_cls != ignore_class,:,:,:]
-        truths = truths[data_cls != ignore_class,:,:,:]
-        vtruths = vtruths[vdata_cls != ignore_class,:,:,:]
-        data_cls = data_cls[data_cls != ignore_class]
-        vdata_cls = vdata_cls[vdata_cls != ignore_class]
-
-        for reAssignIdx in range(ignore_class+1, data_cls_num):
-            data_cls[data_cls == reAssignIdx] -= 1
-            vdata_cls[vdata_cls == reAssignIdx] -= 1
-        data_cls_num -= 1
-        # for cls in
-        # if ignore_class != data_cls_num:
-        #     data_cls[data_cls == 0]
-    # print(vdata_cls)
-
 
     if mode == 'train':
         data_provider = SimpleDataProvider(data, truths, data_cls = data_cls, data_cls_num=data_cls_num, process_dict = para_dict_use['proc_dict'], onehot_cls=True, verbose=False)

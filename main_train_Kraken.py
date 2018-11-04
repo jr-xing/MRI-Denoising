@@ -12,13 +12,26 @@ gpu_ind = para_dict_use_train.get('GPU_IND', '3')
 os.environ['CUDA_VISIBLE_DEVICES'] = gpu_ind # 0,1,2,3
 
 #%% Load data
-from scadec_Hydra.image_util import get_data_provider
+from scadec_Kraken.image_util import get_data_provider
 data_provider, valid_provider, data_channels, truth_channels, training_iters = get_data_provider(para_dict_use_train, 'train', DEBUG_MODE=False)
 
 # -----------------------------------Loss------------------------------------------------------- #
+from scadec_Kraken.unet_bn_Kraken import Unet_bn
 losses_dict = para_dict_use_train['losses']
-kwargs = para_dict_use_train['kwargs']
-kwargs['structure']['n_classes'] -= len(para_dict_use_train.get('ignore_classes', []))
+if type(para_dict_use_train['kwargs']) == dict:
+	kwargs = para_dict_use_train['kwargs']
+	kwargs_list = {}
+	for key, value in kwargs.items():
+		if key not in ['Ob','Gt','eopchs','optimizer','server','GPU_IND']:
+			kwargs_list[key] = [value]
+
+	# net = Unet_bn(img_channels=data_channels, truth_channels=truth_channels, cost_dict_list=losses_dict, **kwargs)
+
+elif type(para_dict_use_train['kwargs']) == list:	
+	kwargs_list = para_dict_use_train['kwargs']
+	kwargs = kwargs_list[0]
+
+net = Unet_bn(img_channels=data_channels, truth_channels=truth_channels, cost_dict_lists=losses_dict, kwargs_list=kwargs_list)
 
 ####################################################
 ####                  NETWORK                    ###
@@ -28,13 +41,14 @@ kwargs['structure']['n_classes'] -= len(para_dict_use_train.get('ignore_classes'
 	here we specify the neural network.
 
 """
-from scadec_Hydra.unet_bn_Hydra import Unet_bn
-net = Unet_bn(img_channels=data_channels, truth_channels=truth_channels, cost_dict_list=losses_dict, **kwargs)
+
+# net = Unet_bn(img_channels=data_channels, truth_channels=truth_channels, cost_dict_list=losses_dict, **kwargs)
+
 
 ####################################################
 ####                 TRAINING                    ###
 ####################################################
-from scadec_Hydra.train_Hydra import Trainer_bn
+from scadec_Kraken.train_Kraken import Trainer_bn
 
 # args for training
 batch_size = kwargs.get("batch_size", 5) # batch size for training
@@ -57,6 +71,4 @@ time_start= time.time()
 trainer = Trainer_bn(net, batch_size=batch_size, optimizer = para_dict_use_train.get('optimizer','adam'), opt_kwargs=opt_kwargs, verbose=False)
 path = trainer.train(data_provider, output_path, valid_provider, valid_size, dropout=para_dict_use_train['Keep'], training_iters=training_iters, epochs=epochs, display_step=100, save_epoch=20, prediction_path=prediction_path)
 time_end = time.time()
-pprint.pprint('Finish training: '+ para_str_use_train)
-pprint.pprint(para_dict_use_train)
 print(time_end - time_start)

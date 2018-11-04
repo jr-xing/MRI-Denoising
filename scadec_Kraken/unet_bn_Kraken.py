@@ -29,9 +29,9 @@ import logging
 
 import tensorflow as tf
 
-from scadec_Hydra import util
-from scadec_Hydra.layers import *
-from scadec_Hydra.nets_Hydra import *
+from scadec_Kraken import util
+from scadec_Kraken.layers import *
+from scadec_Kraken.nets_Kraken import *
 
 sys.path.append(os.path.join(os.path.dirname(sys.path[0]), "./"))
 sys.path.append(os.path.join(os.path.dirname(sys.path[0]), "./scadec/"))
@@ -55,25 +55,24 @@ class Unet_bn(object):
     :param kwargs: args passed to create_net function. 
     """
    
-    def __init__(self, img_channels=3, truth_channels=3, cost_dict_list=[{'name':'l2'}], x_shape = None, y_shape = None, **kwargs):
+    # def __init__(self, img_channels=3, truth_channels=3, cost_dict_list=[{'name':'l2'}], x_shape = None, y_shape = None, **kwargs):
+    def __init__(self, kwargs_list, img_channels=3, truth_channels=3, cost_dict_lists=[["naive",{'name':'l2'}]], x_shape = None, y_shape = None):
         tf.reset_default_graph()
 
         # basic variables
+        kwargs = kwargs_list[0]
+        self.structure_type = kwargs.get('structure_type','highLowPass')
         self.summaries = kwargs.get("summaries", True)
         self.img_channels = img_channels
         self.truth_channels = truth_channels
         self.batch_size = kwargs.get("batch_size", 5)
         self.ifGAN = kwargs.pop('GAN', False)
 
-        # placeholders for input x and y
-        if x_shape != None:
-            # Assign shape to use VGGNet - Xing
-            self.x = tf.placeholder("float", shape=x_shape)
-            self.y = tf.placeholder("float", shape=y_shape)
-        else:
-            self.x = tf.placeholder("float", shape=[None, None, None, img_channels])
-            self.y = tf.placeholder("float", shape=[None, None, None, truth_channels])
-            # Added by Xing
+        # placeholders for input x and y    
+        # self.x = tf.placeholder("float", shape=x_shape, name='x')
+        # self.y = tf.placeholder("float", shape=y_shape, name='y')
+        self.x = tf.placeholder("float", shape=[None, None, None, img_channels], name='x')
+        self.y = tf.placeholder("float", shape=[None, None, None, truth_channels], name='y')
         self.phase = tf.placeholder(tf.bool, name='phase')
         self.keep_prob = tf.placeholder(tf.float32, name='keep_prob') #dropout (keep probability)
         self.current_epoch = tf.placeholder(tf.int32, name='current_epoch')
@@ -81,8 +80,6 @@ class Unet_bn(object):
 
 
         # reused variables
-        # self.batch_size = tf.shape(self.x)[0]
-        # self.batch_size = 5
         self.nx = tf.shape(self.x)[1]
         self.ny = tf.shape(self.x)[2]
         self.num_examples = tf.shape(self.x)[0]
@@ -90,54 +87,109 @@ class Unet_bn(object):
         # variables need to be calculated
         # self.recons = unet_decoder(self.x, self.keep_prob, self.phase, self.img_channels, self.truth_channels, **kwargs)
         # Xing
-        self.structure = kwargs.get('structure',{'type':'Hydra'})
-        if type(self.structure) == dict:
-            self.structure_type = self.structure['type']
-            self.batch_cls = tf.placeholder(tf.int32,[None, kwargs['structure'].get('n_classes',1)], name='batch_cls')
-        else:
-            self.structure_type = self.structure
-            self.batch_cls = tf.placeholder(tf.int32,[None, kwargs.get('n_classes',1)], name='batch_cls')
+        # Kraken change
+        # self.structure = kwargs.get('structure',{'type':'Hydra'})
+        # if type(self.structure) == dict:
+        #     self.structure_type = self.structure['type']
+        #     self.batch_cls = tf.placeholder(tf.int32,[None, kwargs['structure'].get('n_classes',1)], name='batch_cls')
+        # else:
+        #     self.structure_type = self.structure
+        #     self.batch_cls = tf.placeholder(tf.int32,[None, kwargs.get('n_classes',1)], name='batch_cls')
+        # self.structure_type = 'Hydra'
+        self.structure_type = kwargs.get('structure_type','highLowPass')
+        self.batch_cls = tf.placeholder(tf.int32,[None, kwargs.get('n_classes',1)], name='batch_cls')
+        # self.batch_cls = 1
         
-        if kwargs.pop('no_GAN_net_func', False):
-            if self.structure_type == 'Hydra' or self.structure_type == 'HydraEr':
-                self.necks = unet_decoder_noGAN(self.x, self.keep_prob, self.phase, self.img_channels, self.truth_channels, **kwargs)
-            elif self.structure_type == 'Nagini':
-                self.recons = unet_decoder_noGAN(self.x, self.keep_prob, self.phase, self.img_channels, self.truth_channels, **kwargs)
-            else:
-                raise ValueError('Unknown Net Structure: '+self.structure_type)        
-        else:
-            if self.structure_type == 'Hydra' or self.structure_type == 'HydraEr':
-                self.necks = unet_decoder(self.x, self.keep_prob, self.phase, self.img_channels, self.truth_channels, **kwargs)
-            elif self.structure_type == 'Nagini':
-                self.recons = unet_decoder(self.x, self.keep_prob, self.phase, self.img_channels, self.truth_channels, **kwargs)
-            else:
-                raise ValueError('Unknown Net Structure type: '+self.structure_type)        
-        
-        # Additional info
-        # Array Version
-        # self.batch_cls = tf.placeholder(tf.int32,[None], name='batch_cls')
-        # one hot version
-        # self.batch_cls = tf.placeholder(tf.int32,[None, kwargs.get('n_classes',1)], name='batch_cls')
+        self._get_net(kwargs_list)        
 
         # Xing
-        self.loss_dict = self._get_cost(cost_dict_list)
-        self.loss_no_disc = self.loss_dict['total_loss']
-        self.valid_loss_dict = self._get_cost(cost_dict_list)
-
-        # GAN
-        if self.ifGAN:
-            self.disc_loss, self.disc_loss_real = self._get_discriminator_loss()
-        else:
-            self.disc_loss = None
-            self.disc_loss_real = None
-        # Total loss
-        
+        self.loss_dict = self._get_cost(cost_dict_lists)
+        self.valid_loss_dict = self._get_cost(cost_dict_lists)
+                
+        # Total loss        
         self.loss = self.loss_dict['total_loss']
         self.valid_loss = self.valid_loss_dict['total_loss']
                 
         self.avg_psnr = self._get_measure('avg_psnr')
         self.valid_avg_psnr =  self._get_measure('avg_psnr')
 
+    def _get_net(self, kwargs_list):
+        # def get_lowPass(mode='constant'):
+        #     if mode='constant':
+        #         return 
+        
+        kwargs = kwargs_list[0]
+        if len(kwargs_list) > 1:
+            structure_type = kwargs.pop('structure_type','highLowPass')
+            if structure_type == 'highLowPass':
+                lowPass_kwargs  = [kwargs for kwargs in kwargs_list[1:] if kwargs['name']=='lowPass'][0]
+                highPass_kwargs = [kwargs for kwargs in kwargs_list[1:] if kwargs['name']=='highPass'][0]
+                if lowPass_kwargs['structure']['type'] != 'Nagini':
+                    raise ValueError("Not supported structure: %s" % lowPass_kwargs['structure'])
+                if highPass_kwargs['structure']['type'] != 'Nagini':
+                    raise ValueError("Not supported structure: %s" % highPass_kwargs['structure'])
+                
+                # lowPassFilter_np = np.ones((3,3))/9
+                # lowPassFilter_tf = tf.constant_initializer(value=lowPassFilter_np, dtype=tf.float32)
+                def get_gradient(img):
+                    # gradX = tf.reshape(tf.constant([[0,0,0],[1,0,-1],[0,0,0]],tf.float32),[3, 3, 1, 1])
+                    # gradY = tf.reshape(tf.constant([[0,1,0],[0,0,0],[0,-1,0]],tf.float32),[3, 3, 1, 1])
+                    # imgX = tf.nn.conv2d(img, gradX, strides=[1,1,1,1], padding='SAME')
+                    # imgY = tf.nn.conv2d(img, gradY, strides=[1,1,1,1], padding='SAME')
+                    # print(img.shape)
+                    imgY, imgX = tf.image.image_gradients(img)
+                    return tf.sqrt(tf.square(imgX)+tf.square(imgY), name='xHighPass')
+                
+                def get_blured(img, size = 3):
+                    self.lowPassFilter_C3 = tf.constant(1/size**2, shape=[size, size, 3, 3], name='lowPass_filter_C1')
+                    return tf.nn.conv2d(img, self.lowPassFilter_C3, strides = [1,1,1,1], padding='SAME', name = 'xlowPass')
+                    
+
+                
+                # self.xLowPass = tf.nn.conv2d(self.x, self.lowPassFilter_C3, strides = [1,1,1,1], padding='SAME', name = 'xlowPass')
+                # https://datascience.stackexchange.com/questions/19945/tensorflow-can-not-convert-float-into-a-tensor
+                # self.xHighPass = tf.subtract(self.x, self.xLowPass, name = 'xHighPass')
+
+                self.xLowPass = get_blured(self.x, 7)
+                # print('XXXXXXXXXXXXXXXXXXXXXXX')
+                # print(self.x)
+                # print(self.x.shape)
+                self.xHighPass = get_gradient(self.x)
+                # self.xHighPass = self.x
+                # imgY, imgX = tf.image.image_gradients(self.x)
+                # self.xHighPass = tf.sqrt(tf.square(imgX)+tf.square(imgY), name='xHighPass')
+                with tf.variable_scope('lowPass'):
+                    self.recons_lowPass  = unet_decoder(self.xLowPass,  self.keep_prob, self.phase, self.img_channels, self.truth_channels, **{**kwargs,**lowPass_kwargs})
+                with tf.variable_scope('highPass'):
+                    self.recons_highPass = unet_decoder(self.xHighPass, self.keep_prob, self.phase, self.img_channels, self.truth_channels, **{**kwargs,**highPass_kwargs})                                
+                
+                
+                # self.recons = (self.recons_lowPass + self.recons_lowPass)/2
+                recons_concat = concat(self.recons_highPass, self.recons_lowPass)#,'recons_concat')
+                recons_concat = conv2d(recons_concat, 3, 10, self.keep_prob, 'recons_1')
+                recons_concat = conv2d(recons_concat, 3, 3, self.keep_prob, 'recons_2')
+                self.recons = conv2d(recons_concat, 1, self.truth_channels, self.keep_prob, 'recons')
+                # output = conv2d(in_node, 1, truth_channels, keep_prob, '{}_conv2truth_channels'.format(neck_idx))
+
+            else:
+                raise ValueError('Unknown structure_type: %s' % structure_type)
+                    
+        else:
+            if kwargs.pop('no_GAN_net_func', False):
+                if self.structure_type == 'Hydra' or self.structure_type == 'HydraEr':
+                    self.necks = unet_decoder_noGAN(self.x, self.keep_prob, self.phase, self.img_channels, self.truth_channels, **kwargs)
+                elif self.structure_type == 'Nagini':
+                    self.recons = unet_decoder_noGAN(self.x, self.keep_prob, self.phase, self.img_channels, self.truth_channels, **kwargs)
+                else:
+                    raise ValueError('Unknown Net Structure: '+self.structure_type)        
+            else:
+                if self.structure_type == 'Hydra' or self.structure_type == 'HydraEr':
+                    self.necks = unet_decoder(self.x, self.keep_prob, self.phase, self.img_channels, self.truth_channels, **kwargs)
+                elif self.structure_type == 'Nagini':
+                    self.recons = unet_decoder(self.x, self.keep_prob, self.phase, self.img_channels, self.truth_channels, **kwargs)
+                else:
+                    raise ValueError('Unknown Net Structure type: '+self.structure_type)        
+    
     def _get_measure(self, measure):
         total_pixels = self.nx * self.ny * self.truth_channels
         dtype       = self.x.dtype
@@ -166,13 +218,12 @@ class Unet_bn(object):
 
         return result
         
-    def _get_cost(self, cost_dict_list):
+    def _get_cost(self, cost_dict_lists):
         """
         Constructs the cost function.
 
         """
         #Tracer()        
-        # ddprint('_get_cost')
         dprint('Computing Cost...')
         # total_pixels = self.nx * self.ny * self.truth_channels
 
@@ -204,16 +255,6 @@ class Unet_bn(object):
                 normMask = get_mask('norm', h, w)
                 return 1 - normMask
 
-
-        def non_max_suppression(input, window_size = 3):
-            # From: https://stackoverflow.com/questions/42879109/tensorflow-non-maximum-suppression
-            # input: B x W x H x C
-            pooled = tf.nn.max_pool(input, ksize=[1, window_size, window_size, 1], strides=[1,1,1,1], padding='SAME')
-            output = tf.where(tf.equal(input, pooled), input, tf.zeros_like(input))
-
-            # Note: if input has negative values, the suppressed values can be higher than original 
-            return output # output: B X W X H x C
-
         def get_edge(img, operator, get_XY = False, NMS = False, NMS_window_size = 3):
             # https://blog.csdn.net/huanghuangjin/article/details/81130171
             # https://www.cnblogs.com/wxl845235800/p/7700867.html
@@ -222,9 +263,6 @@ class Unet_bn(object):
                 gradY = tf.reshape(tf.constant([[0,1,0],[0,0,0],[0,-1,0]],tf.float32),[3, 3, 1, 1])
                 imgX = tf.nn.conv2d(img, gradX, strides=[1,1,1,1], padding='SAME')
                 imgY = tf.nn.conv2d(img, gradY, strides=[1,1,1,1], padding='SAME')
-                if NMS:
-                    imgX = non_max_suppression(imgX, NMS_window_size)
-                    imgY = non_max_suppression(imgY, NMS_window_size)
 
                 if get_XY:
                     return imgX, imgY
@@ -250,7 +288,7 @@ class Unet_bn(object):
                 raise ValueError("Unknown edge type: "+operator)
 
         
-        def get_losses(x, y, cost_dict_list):
+        def get_losses(x, y, cost_dict_list, prefix = ''):
             loss = 0
             loss_dict = {}
             for cost_dict in cost_dict_list:
@@ -308,7 +346,6 @@ class Unet_bn(object):
                     mask = get_mask(mode=cost_dict.get('mask',None),h=320,w=320)
                     x_fft = tf.multiply(tf.fft2d(tf.cast(x,tf.complex64)), mask)
                     y_fft = tf.multiply(tf.fft2d(tf.cast(y,tf.complex64)), mask)
-                    # loss_kl2 = tf.losses.mean_squared_error(x_fft.real, y_fft.real) + tf.losses.mean_squared_error(x_fft.imag, y_fft.imag)
                     loss_kl2 = tf.losses.mean_squared_error(tf.real(x_fft), tf.real(y_fft)) + tf.losses.mean_squared_error(tf.imag(x_fft), tf.imag(y_fft))
                     current_loss = loss_kl2
                     current_loss_name = cost_dict['name']
@@ -317,7 +354,6 @@ class Unet_bn(object):
                     mask = get_mask(mode=cost_dict.get('mask',None),h=320,w=320)
                     x_fft = tf.multiply(tf.fft2d(tf.cast(x,tf.complex64)), mask)
                     y_fft = tf.multiply(tf.fft2d(tf.cast(y,tf.complex64)), mask)
-                    # loss_kl2 = tf.losses.mean_squared_error(x_fft.real, y_fft.real) + tf.losses.mean_squared_error(x_fft.imag, y_fft.imag)
                     loss_kl1 = tf.losses.absolute_difference(tf.real(x_fft), tf.real(y_fft)) + tf.losses.absolute_difference(tf.imag(x_fft), tf.imag(y_fft))
                     current_loss = loss_kl1
                     current_loss_name = cost_dict['name']    
@@ -331,206 +367,81 @@ class Unet_bn(object):
                 
                 
                 loss += cost_dict['weight']*current_loss
-                loss_dict[current_loss_name] = current_loss
+                loss_dict[prefix + current_loss_name] = current_loss
                 #loss +=  tf.cond(check_if_valid(cost_dict), lambda: cost_dict['weight']*current_loss, lambda: 0.0)                
                 #loss_dict[current_loss_name] = tf.cond(check_if_valid(cost_dict), lambda: current_loss, lambda: 0.0)
 
             loss_dict['total_loss'] = loss
-            return loss_dict
+            return loss_dict        
         
-        # def head(img):
-        #     # global sliceIdx
-        #     return img
-        
-        # Hydra
-        # batch_size = tf.shape(self.x)[0]
+        # Initial loss dict
         # Create total loss dict
+        # EDIT!
         total_loss_dict = {}
-        total_loss_dict['total_loss'] = 0
-        for cost_dict in cost_dict_list:
-            if cost_dict['name'] == 'edge':
-                total_loss_dict[cost_dict['edge_type']]=0
-            else:
-                total_loss_dict[cost_dict['name']] = 0
-        
-        dprint('Structure: '+self.structure_type)
-        if self.structure_type == 'Hydra' or self.structure_type == 'HydraEr':
-            dprint('Init self.recons:')
-            self.recons = None
-            dprint(self.recons)
-            dprint('batch_size: {}'.format(self.batch_size))
-            for img_idx in range(self.batch_size):            
-                img_class_onehot = self.batch_cls[img_idx, :]
-                recon = tf.reshape(tf.dynamic_partition(self.necks, img_class_onehot, 2, name = 'part_necks')[0][0][img_idx,:,:,:],[1,320,320,self.truth_channels], name = 'reshape_recon')                  
-                y = tf.reshape(self.y[img_idx,:,:,:],[1,320,320,self.truth_channels])
-                
-                loss_dict = get_losses(recon, y, cost_dict_list)                
-                
-                if self.recons == None:
-                    dprint('Create self.recons')
-                    self.recons = recon
-                else:
-                    dprint('Concat self.recons')
-                    self.recons = tf.concat([self.recons, recon],axis=0)                                        
-                    
-
-                for key, value in loss_dict.items():
-                    total_loss_dict[key] += value
-
-        elif self.structure_type == 'Nagini':
-            loss_dict = get_losses(self.recons, self.y, cost_dict_list)
-
-            for key, value in loss_dict.items():
-                total_loss_dict[key] += value
-
-        return total_loss_dict
-
-
-
-        
-        # loss = 0
-        # loss_dict = {}
+        # total_loss_dict['total_loss'] = 0
         # for cost_dict in cost_dict_list:
-        #     if cost_dict['name'] == 'l2' or cost_dict['name'] == 'mean_square_error':                
-        #         mask = get_mask(mode=cost_dict.get('mask',None),img_h=320,img_w=320)                
-        #         loss_l2 = tf.losses.mean_squared_error(tf.multiply(self.recons,mask), tf.multiply(self.y,mask))
-        #         current_loss = loss_l2
-        #         current_loss_name = 'mean_square_error'
-        #         #loss += cost_dict['weight']*loss_l2
-        #         #loss_dict['meaｎ_square_loss'] = loss_l2
-
-        #     elif cost_dict['name'] == 'edge':
-        #         mask = get_mask(mode=cost_dict.get('mask',None),img_h=320,img_w=320)
-        #         if cost_dict.get('mask_before_operate',False):
-        #             # Get masked images
-        #             recons_masked = tf.multiply(self.recons, mask)
-        #             y_masked = tf.multiply(self.y, mask)
-
-        #             # Compute edge loss
-        #             if cost_dict.get('get_XY',False):
-        #                 edge_recons_X,edge_recons_Y = get_edge(recons_masked, operator=cost_dict['edge_type'], get_XY=True)
-        #                 edge_y_X,edge_y_Y = get_edge(y_masked, operator=cost_dict['edge_type'], get_XY=True)
-        #                 loss_masked_edge = tf.losses.absolute_difference(edge_recons_X, edge_y_X)+tf.losses.absolute_difference(edge_recons_Y, edge_y_Y)
-        #             else:
-        #                 edge_recons = get_edge(recons_masked, operator=cost_dict['edge_type'])
-        #                 edge_y = get_edge(y_masked, operator=cost_dict['edge_type'])
-        #                 loss_masked_edge = tf.losses.mean_squared_error(edge_recons, edge_y)   
-        #             # Loss
-        #             current_loss = loss_masked_edge
-        #             current_loss_name = cost_dict['edge_type']
-
-        #         else:                    
-        #             if cost_dict.get('get_XY',False):
-        #                 edge_recons_X,edge_recons_Y = get_edge(self.recons, operator=cost_dict['edge_type'], get_XY=True)
-        #                 edge_y_X,edge_y_Y = get_edge(self.y, operator=cost_dict['edge_type'], get_XY=True)
-        #                 loss_edge_masked = tf.losses.absolute_difference(tf.multiply(edge_recons_X,mask), tf.multiply(edge_y_X,mask)) + \
-        #                                     tf.losses.absolute_difference(tf.multiply(edge_recons_Y,mask), tf.multiply(edge_y_Y,mask))
-        #             else:
-        #                 edge_recons = get_edge(self.recons, operator=cost_dict['edge_type'])
-        #                 edge_y = get_edge(self.y, operator=cost_dict['edge_type'])
-        #                 loss_edge_masked = tf.losses.mean_squared_error(tf.multiply(edge_recons, mask), tf.multiply(edge_y, mask))
-        #             current_loss = loss_edge_masked
-        #             current_loss_name = cost_dict['edge_type']
-
+        #     if cost_dict['name'] == 'edge':
+        #         total_loss_dict[cost_dict['edge_type']]=0
         #     else:
-        #         raise ValueError("Unknown cost function: "+cost_dict['name'])
+        #         total_loss_dict[cost_dict['name']] = 0
+        
+        # Get loss
+        if self.structure_type == 'highLowPass':  
+            # self.lowPassFilter = tf.constant(1/9, shape=[1, 3, 3, 1], name='lowPass_filter')
+            # xLowPass = tf.nn.conv2d(self.x, self.lowPassFilter, strides = [1,1,1,1], padding='SAME', name = 'lowPass')
 
-        #     if cost_dict.get('upper_bound',False):
-        #         #current_loss =  tf.clip_by_value(current_loss, 0.0, cost_dict.get('upper_bound',0.5))
-        #         current_loss =  tf.clip_by_norm(current_loss, cost_dict.get('upper_bound',0.5))
+            def get_gradient(img):
+                # gradX = tf.reshape(tf.constant([[0,0,0],[1,0,-1],[0,0,0]],tf.float32),[3, 3, 1, 1])
+                # gradY = tf.reshape(tf.constant([[0,1,0],[0,0,0],[0,-1,0]],tf.float32),[3, 3, 1, 1])
+                # imgX = tf.nn.conv2d(img, gradX, strides=[1,1,1,1], padding='SAME')
+                # imgY = tf.nn.conv2d(img, gradY, strides=[1,1,1,1], padding='SAME')                    
+                imgY, imgX = tf.image.image_gradients(img)
+                return tf.sqrt(tf.square(imgX)+tf.square(imgY), name='yHighPass')
             
-        #     loss += cost_dict['weight']*current_loss
-        #     loss_dict[current_loss_name] = current_loss
+            def get_blured(img, size = 3):
+                self.lowPassFilter_C1 = tf.constant(1/size**2, shape=[size, size, 1, 1], name='lowPass_filter_C1')
+                return tf.nn.conv2d(img, self.lowPassFilter_C1, strides = [1,1,1,1], padding='SAME', name = 'ylowPass')
 
-        # loss_dict['total_loss'] = loss
-        # return loss_dict
-    
-    def _get_discriminator_loss(self):
-        # CP from pix2pix
-        EPS = 1e-12
-        def discrim_conv(batch_input, out_channels, stride):
-            padded_input = tf.pad(batch_input, [[0, 0], [1, 1], [1, 1], [0, 0]], mode="CONSTANT")
-            return tf.layers.conv2d(padded_input, out_channels, kernel_size=4, strides=(stride, stride), padding="valid", kernel_initializer=tf.random_normal_initializer(0, 0.02))
-        
-        def lrelu(x, a):
-            with tf.name_scope("lrelu"):
-                # adding these together creates the leak part and linear part
-                # then cancels them out by subtracting/adding an absolute value term
-                # leak: a*x/2 - a*abs(x)/2
-                # linear: x/2 + abs(x)/2
+            # self.lowPassFilter_C1 = tf.constant(1/9, shape=[3, 3, 1, 1], name='lowPass_filter_C3')
+            # yLowPass = tf.nn.conv2d(self.y, self.lowPassFilter_C1, strides = [1,1,1,1], padding='SAME', name = 'ylowPass')
+            self.yLowPass = get_blured(self.y, 7)
+            lowPass_loss_list = [cost_dict_list for cost_dict_list in cost_dict_lists if cost_dict_list[0]=='forLowPass'][0][1:]
+            lowPass_loss_dict = get_losses(self.recons_lowPass, self.yLowPass, lowPass_loss_list, prefix='lowPass')
+            
+            # yHighPass = tf.subtract(self.y, yLowPass, name = 'yHighPass')
+            # print('YYYYYYYYYYYYYYYYYYYYYYY')
+            # print(self.y)
+            self.yHighPass = get_gradient(self.y)
+            highPass_loss_list = [cost_dict_list for cost_dict_list in cost_dict_lists if cost_dict_list[0]=='forHighPass'][0][1:]
+            highPass_loss_dict = get_losses(self.recons_highPass, self.yHighPass, highPass_loss_list, prefix='highPass')
+            # print(highPass_loss_dict.keys())
+            
+            recons_loss_list = [cost_dict_list for cost_dict_list in cost_dict_lists if cost_dict_list[0]=='forRecon'][0][1:]
+            recons_loss_dict = get_losses(self.recons, self.y, recons_loss_list, prefix='recon')
 
-                # this block looks like it has 2 inputs on the graph unless we do this
-                x = tf.identity(x)
-                return (0.5 * (1 + a)) * x + (0.5 * (1 - a)) * tf.abs(x)
+            for loss_dict in [lowPass_loss_dict, highPass_loss_dict, recons_loss_dict]:
+                for key, value in loss_dict.items():
+                    if key in total_loss_dict:
+                        total_loss_dict[key] += value
+                    else:
+                        total_loss_dict[key]  = value
+            
+            # for key, value in highPass_loss_dict.items():
+            #     if key in total_loss_dict:
+            #         total_loss_dict[key] += value
+            #     else:
+            #         total_loss_dict[key]  = value
+            
+            # for key, value in highPass_loss_dict.items():
+            #     if key in total_loss_dict:
+            #         total_loss_dict[key] += value
+            #     else:
+            #         total_loss_dict[key]  = value
+                # total_loss_dict[key] += value
                 
-        def batchnorm(inputs):
-            return tf.layers.batch_normalization(inputs, axis=3, epsilon=1e-5, momentum=0.1, training=True, gamma_initializer=tf.random_normal_initializer(1.0, 0.02))
-
-        def create_discriminator(discrim_inputs, discrim_targets):            
-            n_layers = 2
-            ndf = 32    # number of discriminator filters in first conv layer
-            layers = []
-
-            # 2x [batch, height, width, in_channels] => [batch, height, width, in_channels * 2]
-            input = tf.concat([discrim_inputs, discrim_targets], axis=3)
-
-            # layer_1: [batch, 256, 256, in_channels * 2] => [batch, 128, 128, ndf]
-            with tf.variable_scope("layer_1"):
-                convolved = discrim_conv(input, ndf, stride=2)
-                rectified = lrelu(convolved, 0.2)
-                layers.append(rectified)
-
-            # layer_2: [batch, 128, 128, ndf] => [batch, 64, 64, ndf * 2]
-            # layer_3: [batch, 64, 64, ndf * 2] => [batch, 32, 32, ndf * 4]
-            # layer_4: [batch, 32, 32, ndf * 4] => [batch, 31, 31, ndf * 8]
-            for i in range(n_layers):
-                with tf.variable_scope("layer_%d" % (len(layers) + 1)):
-                    out_channels = ndf * min(2**(i+1), 8)
-                    stride = 1 if i == n_layers - 1 else 2  # last layer here has stride 1
-                    convolved = discrim_conv(layers[-1], out_channels, stride=stride)
-                    normalized = batchnorm(convolved)
-                    rectified = lrelu(normalized, 0.2)
-                    layers.append(rectified)
-
-            # layer_5: [batch, 31, 31, ndf * 8] => [batch, 30, 30, 1]
-            with tf.variable_scope("layer_%d" % (len(layers) + 1)):
-                convolved = discrim_conv(rectified, out_channels=1, stride=1)
-                output = tf.sigmoid(convolved)
-                layers.append(output)
-
-            return layers[-1]
+                # total_loss_dict['total_loss'] += 
         
-        # create two copies of discriminator, one for real pairs and one for fake pairs
-        # they share the same underlying variables
-        # Discriminator take (condition, image(fake/real))
-        with tf.name_scope("real_discriminator"):
-            with tf.variable_scope("discriminator"):
-                # 2x [batch, height, width, channels] => [batch, 30, 30, 1]
-                predict_real = create_discriminator(self.x, self.y)
-
-        with tf.name_scope("fake_discriminator"):
-            with tf.variable_scope("discriminator", reuse=True):
-                # 2x [batch, height, width, channels] => [batch, 30, 30, 1]
-                predict_fake = create_discriminator(self.x, self.recons)
-
-        with tf.name_scope("discriminator_loss"):
-            # minimizing -tf.log will try to get inputs to 1
-            # predict_real => 1
-            # predict_fake => 0        
-            discrim_loss = tf.reduce_mean(-(tf.log(predict_real + EPS) + tf.log(1 - predict_fake + EPS)))
-            discrim_loss_real = tf.reduce_mean(-(tf.log(predict_real + EPS)))
-        
-        weight = 1e-4
-        gen_loss_GAN = tf.reduce_mean(-tf.log(predict_fake + EPS))
-        
-        self.loss_dict['GAN_generator'] = gen_loss_GAN
-        self.loss_dict['total_loss'] += gen_loss_GAN * weight
-        
-        self.valid_loss_dict['GAN_generator'] = gen_loss_GAN
-        self.valid_loss_dict['total_loss'] += gen_loss_GAN * weight
-        
-        return discrim_loss, discrim_loss_real
-
+        return total_loss_dict
 
 
     # predict
