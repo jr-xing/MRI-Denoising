@@ -66,13 +66,13 @@ class Unet_bn(object):
         self.ifGAN = kwargs.pop('GAN', False)
 
         # placeholders for input x and y
-        if x_shape != None:
-            # Assign shape to use VGGNet - Xing
-            self.x = tf.placeholder("float", shape=x_shape)
-            self.y = tf.placeholder("float", shape=y_shape)
-        else:
-            self.x = tf.placeholder("float", shape=[None, None, None, img_channels])
-            self.y = tf.placeholder("float", shape=[None, None, None, truth_channels])
+        # if x_shape != None:
+        #     # Assign shape to use VGGNet - Xing
+        #     self.x = tf.placeholder("float", shape=x_shape)
+        #     self.y = tf.placeholder("float", shape=y_shape)
+        # else:
+        self.x = tf.placeholder("float", shape=[None, None, None, img_channels])
+        self.y = tf.placeholder("float", shape=[None, None, None, truth_channels])
             # Added by Xing
         self.phase = tf.placeholder(tf.bool, name='phase')
         self.keep_prob = tf.placeholder(tf.float32, name='keep_prob') #dropout (keep probability)
@@ -119,6 +119,7 @@ class Unet_bn(object):
         # one hot version
         # self.batch_cls = tf.placeholder(tf.int32,[None, kwargs.get('n_classes',1)], name='batch_cls')
 
+        self.batch_masks = tf.placeholder("float", shape=[None, None, None, truth_channels], name = 'masks')
         # Xing
         self.loss_dict = self._get_cost(cost_dict_list)
         self.loss_no_disc = self.loss_dict['total_loss']
@@ -189,6 +190,12 @@ class Unet_bn(object):
                 mask = np.ones([w, h, 1]) * 0.1
                 mask[:,int(1*w/5):int(4*w/5),:] = 0.5
                 mask[:,int(2*w/5):int(3*w/5),:] = 1.5
+                return mask
+            elif mode == 'mid7':
+                mask = np.ones([w, h, 1]) * 0.05
+                mask[:,int(1*w/7):int(6*w/7),:] = 0.1
+                mask[:,int(2*w/7):int(5*w/7),:] = 1
+                mask[:,int(3*w/7):int(4*w/7),:] = 3
                 return mask
             elif mode == 'norm':
                 from scipy.stats import norm
@@ -359,12 +366,17 @@ class Unet_bn(object):
             self.recons = None
             dprint(self.recons)
             dprint('batch_size: {}'.format(self.batch_size))
-            for img_idx in range(self.batch_size):            
+            for img_idx in range(self.batch_size):
                 img_class_onehot = self.batch_cls[img_idx, :]
-                recon = tf.reshape(tf.dynamic_partition(self.necks, img_class_onehot, 2, name = 'part_necks')[0][0][img_idx,:,:,:],[1,320,320,self.truth_channels], name = 'reshape_recon')                  
+                recon = tf.reshape(tf.dynamic_partition(self.necks, img_class_onehot, 2, name = 'part_necks')[0][0][img_idx,:,:,:],[1,320,320,self.truth_channels], name = 'reshape_recon')
+                mask = tf.reshape(self.batch_masks[img_idx,:,:,:],[1,320,320,self.truth_channels], name='mask') + 1
+                recon_masked = tf.multiply(recon, mask, name = 'masked_recon')
+
                 y = tf.reshape(self.y[img_idx,:,:,:],[1,320,320,self.truth_channels])
+                y_masked = tf.multiply(y, mask, name = 'masked_y')
                 
-                loss_dict = get_losses(recon, y, cost_dict_list)                
+                # loss_dict = get_losses(recon, y, cost_dict_list)                
+                loss_dict = get_losses(recon_masked, y_masked, cost_dict_list)
                 
                 if self.recons == None:
                     dprint('Create self.recons')

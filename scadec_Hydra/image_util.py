@@ -25,7 +25,8 @@ from PIL import Image
 from scipy import ndimage
 import h5py
 
-from scadec_Hydra.util import verbose_print
+from scadec_Hydra.util import verbose_print, get_gradients
+from scadec_Hydra.crop import random_crop
 
 class BaseDataProvider(object):
 
@@ -36,17 +37,17 @@ class BaseDataProvider(object):
     def __call__(self, n, fix=False):
         if type(n) == int and not fix:
             # X and Y are the images and truths
-            train_data, truths, batch_cls = self._next_batch(n)
+            train_data, truths, batch_cls, mask = self._next_batch(n)
         elif type(n) == int and fix:
-            train_data, truths, batch_cls = self._fix_batch(n)
+            train_data, truths, batch_cls, mask = self._fix_batch(n)
         elif type(n) == str and n == 'full':
-            train_data, truths, batch_cls = self._full_batch() 
+            train_data, truths, batch_cls, mask = self._full_batch() 
         else:
             raise ValueError("Invalid batch_size: "%n)
         
         # print('batch(called)')
         # print(batch_cls)
-        return train_data, truths, batch_cls
+        return train_data, truths, batch_cls, mask
 
     def _next_batch(self, n):
         pass
@@ -57,7 +58,7 @@ class BaseDataProvider(object):
 
 class SimpleDataProvider(BaseDataProvider):
     
-    def __init__(self, data, truths, data_cls = None, data_cls_num=None, onehot_cls = False, process_dict = {}, verbose = False):
+    def __init__(self, data, truths, data_cls = None, data_cls_num=None, onehot_cls = False, process_dict = {}, verbose = False, masks=None):
         # additional_info should be list of dicts
         super(SimpleDataProvider, self).__init__()
         # Xing
@@ -82,6 +83,7 @@ class SimpleDataProvider(BaseDataProvider):
         
         self.onehot_cls = onehot_cls
         self.verbose = verbose
+        self.masks = masks
 
 
     def _next_batch(self, n):
@@ -92,35 +94,38 @@ class SimpleDataProvider(BaseDataProvider):
         X = np.zeros((n, nx, ny, self.img_channels))
         Y = np.zeros((n, nx, ny, self.truth_channels))
 
+        # Get data        
+        for i in range(n):
+            X[i] = self._process_data(self.data[idx[i]])
+            Y[i] = self._process_truths(self.truths[idx[i]])
+                
+        # Get labels
         if self.onehot_cls:
             batch_cls = np.zeros([n, self.data_cls_num])
         else:
             batch_cls = np.zeros(n)
+        for i in range(n):
+            if self.onehot_cls:
+                batch_cls[i, self.data_cls[idx[i]]] = 1
+            else:    
+                batch_cls[i] = self.data_cls[idx[i]]
 
-        if self.data_cls_num == 1:
+        # Get masks
+        masks = np.ones((n, nx, ny, self.truth_channels))
+        if self.masks is not None:
             for i in range(n):
-                X[i] = self._process_data(self.data[idx[i]])
-                Y[i] = self._process_truths(self.truths[idx[i]])
-        else:            
-            # verbose_print('next batch indices:'， self.verbose)
-            verbose_print('next batch indices:',self.verbose)
-            verbose_print(idx, self.verbose)
-            for i in range(n):
-                X[i] = self._process_data(self.data[idx[i]])
-                Y[i] = self._process_truths(self.truths[idx[i]])
-                if self.onehot_cls:
-                    batch_cls[i, self.data_cls[idx[i]]] = 1
-                else:    
-                    batch_cls[i] = self.data_cls[idx[i]]
-        
+                masks[i] = self.masks[idx[i]]
+
+            # mask = predict_mask()
+
         # print('(In data Provider)')
         # print('onehot_cls:')
         # print(self.onehot_cls)
         # print('np.shape(batch_cls)')
         # print(np.shape(batch_cls))
-        verbose_print('feed batch_cls in dataProvider: ',self.verbose)
-        verbose_print(batch_cls,self.verbose)
-        return X, Y, batch_cls
+        # verbose_print('feed batch_cls in dataProvider: ',self.verbose)
+        # verbose_print(batch_cls,self.verbose)
+        return X, Y, batch_cls, masks
 
     def _fix_batch(self, n):
         # first n data
@@ -128,30 +133,32 @@ class SimpleDataProvider(BaseDataProvider):
         nx = img.shape[0]
         ny = img.shape[1]
         X = np.zeros((n, nx, ny, self.img_channels))
-        Y = np.zeros((n, nx, ny, self.truth_channels))
+        Y = np.zeros((n, nx, ny, self.truth_channels))            
+
+        # Get images
+        for i in range(n):
+            X[i] = self._process_data(self.data[i])
+            Y[i] = self._process_truths(self.truths[i])
         
+        # Get labels
         if self.onehot_cls:
             batch_cls = np.zeros([n, self.data_cls_num])
         else:
             batch_cls = np.zeros(n)
-
-        if self.data_cls_num == 1:
+        if self.data_cls_num != 1:
             for i in range(n):
-                X[i] = self._process_data(self.data[i])
-                Y[i] = self._process_truths(self.truths[i])
-        else:            
-            for i in range(n):
-                X[i] = self._process_data(self.data[i])
-                Y[i] = self._process_truths(self.truths[i])
-                # print('self.data_cls[i]')
-                # print(type(self.data_cls[i]))
-                # print(self.data_cls[i])
                 if self.onehot_cls:
                     batch_cls[i, self.data_cls[i]] = 1
                 else:    
                     batch_cls[i] = self.data_cls[i]
         
-        return X, Y, batch_cls
+        # Get masks
+        masks = np.ones((n, nx, ny, self.truth_channels))
+        if self.masks is not None:
+            for i in range(n):
+                masks[i] = self.masks[i]
+
+        return X, Y, batch_cls, masks
 
     def _full_batch(self):
         return self._fix_batch(self.file_count)
@@ -182,6 +189,8 @@ class SimpleDataProvider(BaseDataProvider):
             gray_img -= np.amin(gray_img[:,:])
             gray_img /= np.amax(gray_img[:,:])
         return gray_img
+
+# import matplotlib.pyplot as plt
 
 def concat_images(imga, imgb):
     """
@@ -388,7 +397,7 @@ def get_data_provider(para_dict_use, mode = 'train', DEBUG_MODE = False):
                     truths2 = h5py_mat2npy('../data/train_np/traGt_FULL_SEG_part_2.mat')
                     truths3 = h5py_mat2npy('../data/train_np/traGt_FULL_SEG_part_3.mat')
                     truths  = np.concatenate([truths1, truths2, truths3], axis=0)
-                    del(truths1, truths2, truths3)                
+                    # del(truths1, truths2, truths3)                
                     vtruths = h5py_mat2npy('../data/valid_np/valGt.mat')
                 elif mode == 'test' or mode == 'valid':
                     truths = None
@@ -406,12 +415,36 @@ def get_data_provider(para_dict_use, mode = 'train', DEBUG_MODE = False):
     #     return currentCls
 
     # print(vdata_cls)
+    if para_dict_use.get('preMask', False):
+        vdata_masks = np.load('./scadec_Hydra/maskCNN/pre_computed/vdata_FULL_SEG_28_28_masks.npy')
+        # vdata_masks = predict_masks(vtruths, savePatches=False, saveYPre=True, saveMasks=True, saveName='vdata_'+ para_dict_use['Gt'])
+        # vdata_masks = predict_masks(vtruths, savePatches=False, loadYPre=True, saveMasks=True, saveName='vdata_'+ para_dict_use['Gt'])
+
+        if data is not None:
+            # data_masks_1 = predict_masks(truths1, savePatches=False, saveYPre=True, saveMasks=True, saveName='data_'+ para_dict_use['Gt'] + '_1')
+            # data_masks_2 = predict_masks(truths2, savePatches=False, saveYPre=True, saveMasks=True, saveName='data_'+ para_dict_use['Gt'] + '_2')
+            # data_masks_3 = predict_masks(truths3, savePatches=False, saveYPre=True, saveMasks=True, saveName='data_'+ para_dict_use['Gt'] + '_3')
+            
+
+            # data_masks = predict_masks(truths, savePatches=False, saveYPre=True, saveMasks=True, saveName='data_'+ para_dict_use['Gt'])
+            data_masks_1 = np.load('./scadec_Hydra/maskCNN/pre_computed/data_FULL_SEG_1_28_28_masks.npy')
+            data_masks_2 = np.load('./scadec_Hydra/maskCNN/pre_computed/data_FULL_SEG_2_28_28_masks.npy')
+            data_masks_3 = np.load('./scadec_Hydra/maskCNN/pre_computed/data_FULL_SEG_3_28_28_masks.npy')
+
+            data_masks  = np.concatenate([data_masks_1, data_masks_2, data_masks_3], axis=0)    
+
+            # data_masks = predict_masks(truths, savePatches=False, loadYPre=True, saveMasks=True, saveName='data_'+ para_dict_use['Gt'])
+        else:
+            data_masks = None    
+
     for idx, ignore_class in enumerate(ignore_classes):
         ignore_class -= idx
         data = data[data_cls != ignore_class,:,:,:]
-        vdata = vdata[vdata_cls != ignore_class,:,:,:]
+        vdata = vdata[vdata_cls != ignore_class,:,:,:]        
         truths = truths[data_cls != ignore_class,:,:,:]
         vtruths = vtruths[vdata_cls != ignore_class,:,:,:]
+        data_masks = data_masks[data_cls != ignore_class, :, :, :]
+        vdata_masks = vdata_masks[vdata_cls != ignore_class, :, :, :]
         data_cls = data_cls[data_cls != ignore_class]
         vdata_cls = vdata_cls[vdata_cls != ignore_class]
 
@@ -424,13 +457,289 @@ def get_data_provider(para_dict_use, mode = 'train', DEBUG_MODE = False):
         #     data_cls[data_cls == 0]
     # print(vdata_cls)
 
-
+    
     if mode == 'train':
-        data_provider = SimpleDataProvider(data, truths, data_cls = data_cls, data_cls_num=data_cls_num, process_dict = para_dict_use['proc_dict'], onehot_cls=True, verbose=False)
+        data_provider = SimpleDataProvider(data, truths, data_cls = data_cls, data_cls_num=data_cls_num, process_dict = para_dict_use['proc_dict'], onehot_cls=True, verbose=False, masks = data_masks)        
     elif mode == 'test' or mode == 'valid' or mode == 'test_on_train':
-        data_provider = None 
+        data_provider = None
     else:
         raise ValueError('Unknow mode' + mode)
     
-    valid_provider = SimpleDataProvider(vdata, vtruths, data_cls = vdata_cls, data_cls_num=data_cls_num, process_dict = para_dict_use['proc_dict'], onehot_cls=True, verbose=False)
+    
+    valid_provider = SimpleDataProvider(vdata, vtruths, data_cls = vdata_cls, data_cls_num=data_cls_num, process_dict = para_dict_use['proc_dict'], onehot_cls=True, verbose=False, masks = vdata_masks)
     return data_provider, valid_provider, data_channels, truth_channels, training_iters
+
+
+import tensorflow as tf
+import time
+from tqdm import tqdm
+import pickle
+# import numpy as np
+# def predict_masks_old3(test_imgs, crop_num = 5000, model_path = './scadec_Hydra/maskCNN/CNN_mask-2000.meta',
+#                     saveName = 'patches', loadName = 'patches',
+#                     savePatches = False, loadPatches = False,
+#                     saveYPre = False, loadYPre = False,
+#                     saveMasks = False, loadMaskes = False):#, savePath = None):
+#     print('Computing masks...')
+#     startTime = time.time()
+
+#     # 1. Get croped patches    
+#     img_n, img_h, img_w, img_c = np.shape(test_imgs)
+#     masks = np.zeros(np.shape(test_imgs))
+    
+#     cropSize = (28,28)    
+    
+
+#     with tf.Session() as sess:
+#         # Get feed data(img+gradient)
+#         new_saver = tf.train.import_meta_graph(model_path)
+#         new_saver.restore(sess, '.'.join(model_path.split('.')[:-1]))
+        
+#         graph = tf.get_default_graph()
+#         xs = graph.get_operation_by_name('xs').outputs[0]
+#         pred = graph.get_operation_by_name('pred').outputs[0]
+
+#         savefile_img_num = 2000
+#         for imgIdxInAll in tqdm(range(img_n),ncols=75):
+#             # Get patches of {savefile_img_num} imgs
+#             imgIdx = imgIdxInAll % savefile_img_num
+#             # img_n_file = 
+#             if load and imgIdx == 0:
+#                 patches, boxeses = np.load('./scadec_Hydra/maskCNN/pre_computed/{}_{}_{}_patches_{}.pkl'.format(loadName, cropSize[0], cropSize[1], int((imgIdx+1)/savefile_img_num)))
+#             else:
+#                 patches = np.zeros([savefile_img_num*crop_num, cropSize[0], cropSize[1], 2])
+#                 boxeses = []
+#                 for imgIdx in range(img_n):
+#                     img = np.squeeze(test_imgs[imgIdx])
+#                     img_patches, boxes = random_crop(img, crop_size = cropSize, crop_num = crop_num,
+#                                 save = False, saveMode='npy')        
+#                     img_patches = np.reshape(img_patches,list(np.shape(img_patches))+[1])
+#                     img_patches_grad = np.reshape(get_gradients(img_patches[:,:,:,0]),(len(boxes), 28, 28, 1))
+                    
+#                     datum = np.zeros((len(boxes), 28,28,2))
+#                     for idx in range(len(boxes)):
+#                         datum[idx, :, :, :] = np.concatenate([img_patches[idx,:,:], img_patches_grad[idx,:,:]], axis = 2)                
+                    
+#                     patches[imgIdx*crop_num:(imgIdx+1)*crop_num, :, :, :] = datum
+#                     boxeses.append(boxes)
+            
+#             if save and imgIdx == 0:
+#                 # print('Saving...')
+#                 np.save('./scadec_Hydra/maskCNN/pre_computed/{}_{}_{}_patches_{}.pkl'.format(saveName, cropSize[0], cropSize[1], int((imgIdx+1)/2000)), [patches, boxeses])
+
+#             # Get Predictions
+#             if loadYPre:
+#                 y_pre_raw = np.load('./scadec_Hydra/maskCNN/pre_computed/{}_{}_{}_ypre_boxes_{}.pkl'.format(saveName, cropSize[0], cropSize[1], int((imgIdx+1)/2000)))
+#             else:
+#                 # y_pre_raw = np.zeros()
+#                 y_pre_raws = []
+#                 for imgIdx in tqdm(range(img_n),ncols=75):
+#                     y_pre_raws.append(sess.run(pred, feed_dict={xs:patches[imgIdx*crop_num:(imgIdx+1)*crop_num]}))
+#             if saveYPre:
+#                 np.save('./scadec_Hydra/maskCNN/pre_computed/{}_{}_{}_ypre_boxes_{}.pkl'.format(saveName, cropSize[0], cropSize[1], int((imgIdx+1)/2000), y_pre_raws))
+            
+#             # Get masks            
+#             for imgIdx in range(img_n):
+#                 y_pre = y_pre_raws[imgIdx][:,0]>0.9
+#                 boxes = boxeses[imgIdx]
+#                 mask = np.zeros(np.shape(img))
+#                 for idx, box in enumerate(boxes):
+#                     if y_pre[idx] == True:
+#                         mask[box[0]:box[1],box[2]:box[3]] += 0.01
+#                 masks[imgIdx] = np.reshape(mask, [img_h, img_w, img_c])
+#             endTime = time.time()
+#         print('Finished computing masks for {} within {} mins for {} images!'.format(saveName, (endTime - startTime)/60, img_n))
+#     return masks
+
+def predict_masks(test_imgs, crop_num = 5000, model_path = './scadec_Hydra/maskCNN/CNN_mask-2000.meta',
+                    saveName = 'patches', loadName = 'patches',
+                    savePatches = False, loadPatches = False,
+                    saveYPre = False, loadYPre = False,
+                    saveMasks = False, loadMaskes = False):#, savePath = None):
+    # import os
+    # print(os.getcwd())
+    print('Computing masks...')
+    startTime = time.time()
+
+    # 1. Get croped patches    
+    img_n, img_h, img_w, img_c = np.shape(test_imgs)
+    masks = np.zeros(np.shape(test_imgs))
+    print(np.shape(masks))
+    
+    cropSize = (28,28)    
+    savefile_img_num = 2000
+
+    with tf.Session() as sess:
+        # Get feed data(img+gradient)
+        new_saver = tf.train.import_meta_graph(model_path)
+        new_saver.restore(sess, '.'.join(model_path.split('.')[:-1]))
+        
+        graph = tf.get_default_graph()
+        xs = graph.get_operation_by_name('xs').outputs[0]
+        pred = graph.get_operation_by_name('pred').outputs[0]
+
+        # Get patches
+        print('Getting patches...')
+        if loadPatches:
+            patches, boxeses = np.load('./scadec_Hydra/maskCNN/pre_computed/{}_{}_{}_patches_boxeses.npy'.format(loadName, cropSize[0], cropSize[1]))
+            # with open('./scadec_Hydra/maskCNN/pre_computed/{}.pkl'.format(loadName), 'rb') as f:  # Python 3: open(..., 'wb')
+            #     data = pickle.load(f)
+        elif (not loadYPre) and (not loadMaskes):
+            patches = np.zeros([img_n*crop_num, cropSize[0], cropSize[1], 2])
+            boxeses = []
+            # for preTraIdx in tqdm(range(500), ncols=75):
+            for imgIdx in tqdm(range(img_n),ncols=75):
+                img = np.squeeze(test_imgs[imgIdx])
+                img_patches, boxes = random_crop(img, crop_size = cropSize, crop_num = crop_num,
+                            save = False, saveMode='npy')        
+                img_patches = np.reshape(img_patches,list(np.shape(img_patches))+[1])
+                img_patches_grad = np.reshape(get_gradients(img_patches[:,:,:,0]),(len(boxes), 28, 28, 1))
+                
+                datum = np.zeros((len(boxes), 28,28,2))
+                for idx in range(len(boxes)):
+                    datum[idx, :, :, :] = np.concatenate([img_patches[idx,:,:], img_patches_grad[idx,:,:]], axis = 2)                
+                # data.append(datum)
+                patches[imgIdx*crop_num:(imgIdx+1)*crop_num, :, :, :] = datum
+                boxeses.append(boxes)
+        
+        if savePatches:
+            print('Saving...')
+            # np.save('./scadec_Hydra/maskCNN/pre_computed/{}_{}_{}_patches_boxeses'.format(saveName, cropSize[0], cropSize[1]), [patches, boxeses])
+            np.save('./scadec_Hydra/maskCNN/pre_computed/{}_{}_{}_patches'.format(saveName, cropSize[0], cropSize[1]), patches)
+
+        # Get Predictions
+        print('Predicting...')
+        if loadYPre:
+            y_pre_raws = np.load('./scadec_Hydra/maskCNN/pre_computed/{}_{}_{}_ypre.npy'.format(saveName, cropSize[0], cropSize[1]))
+            boxeses = np.load('./scadec_Hydra/maskCNN/pre_computed/{}_{}_{}_boxeses.npy'.format(saveName, cropSize[0], cropSize[1]))
+        elif not loadMaskes:
+            y_pre_raws = []
+            for imgIdx in tqdm(range(img_n),ncols=75):
+                y_pre_raws.append(sess.run(pred, feed_dict={xs:patches[imgIdx*crop_num:(imgIdx+1)*crop_num]}))
+        
+            # a = 1
+        if saveYPre:
+            np.save('./scadec_Hydra/maskCNN/pre_computed/{}_{}_{}_ypre.npy'.format(saveName, cropSize[0], cropSize[1]), y_pre_raws)
+            np.save('./scadec_Hydra/maskCNN/pre_computed/{}_{}_{}_boxeses.npy'.format(saveName, cropSize[0], cropSize[1]), boxeses)
+        
+        # Get masks
+        # y_pres = []
+        print('Computing masks...')
+        for imgIdx in tqdm(range(img_n),ncols=75):
+            y_pre = y_pre_raws[imgIdx][:,0]>0.9
+            boxes = boxeses[imgIdx]
+            mask = np.zeros(np.shape(img))
+            for idx, box in enumerate(boxes):
+                if y_pre[idx] == True:
+                    mask[box[0]:box[1],box[2]:box[3]] += 0.01
+            masks[imgIdx] = np.reshape(mask, [img_h, img_w, img_c])
+        if saveMasks:
+            np.save('./scadec_Hydra/maskCNN/pre_computed/{}_{}_{}_masks'.format(saveName, cropSize[0], cropSize[1]), masks)
+        endTime = time.time()
+        print('Finished computing masks for {} within {} mins for {} images!'.format(saveName, (endTime - startTime)/60, img_n))
+    return masks
+
+def predict_masks_old2(test_imgs, crop_num = 5000, model_path = './scadec_Hydra/maskCNN/CNN_mask-2000.meta'):
+    print('Computing masks...')
+    startTime = time.time()
+
+    # 1. Get croped patches    
+    img_n, img_h, img_w, img_c = np.shape(test_imgs)
+    masks = np.zeros(np.shape(test_imgs))
+    
+    cropSize = (28,28)    
+    
+
+    with tf.Session() as sess:
+        # Get feed data(img+gradient)
+        new_saver = tf.train.import_meta_graph(model_path)
+        new_saver.restore(sess, '.'.join(model_path.split('.')[:-1]))
+        
+        graph = tf.get_default_graph()
+        xs = graph.get_operation_by_name('xs').outputs[0]
+        pred = graph.get_operation_by_name('pred').outputs[0]
+
+        # Get patches
+        print('Getting patches...')
+        data = []
+        for imgIdx in range(img_n):
+            img = np.squeeze(test_imgs[imgIdx])
+            img_patches, boxes = random_crop(img, crop_size = cropSize, crop_num = crop_num,
+                        save = False, saveMode='npy')        
+            img_patches = np.reshape(img_patches,list(np.shape(img_patches))+[1])
+            img_patches_grad = np.reshape(get_gradients(img_patches[:,:,:,0]),(len(boxes), 28, 28, 1))
+            
+            datum = np.zeros((len(boxes), 28,28,2))
+            for idx in range(len(boxes)):
+                datum[idx, :, :, :] = np.concatenate([img_patches[idx,:,:], img_patches_grad[idx,:,:]], axis = 2)                
+            data.append(datum)
+        
+        # Get Predictions
+        print('Predicting...')
+        y_pre_raws = []
+        for imgIdx in range(img_n):
+            y_pre_raws.append(sess.run(pred, feed_dict={xs:data[imgIdx]}))
+        
+        # Get masks
+        # y_pres = []
+        print('Computing masks...')
+        for imgIdx in range(img_n):
+            y_pre = y_pre_raws[imgIdx][:,0]>0.9
+            mask = np.zeros(np.shape(img))
+            for idx, box in enumerate(boxes):
+                if y_pre[idx] == True:
+                    mask[box[0]:box[1],box[2]:box[3]] += 0.01
+            masks[imgIdx] = np.reshape(mask, [img_h, img_w, img_c])
+        endTime = time.time()
+        print('Finished computing masks within {%.2f} mins for {} images!'.format((endTime - startTime)/60, img_n))
+    return masks
+
+        # masks[imgIdx] = np.reshape(predict_mask(np.squeeze(test_imgs[imgIdx]), crop_num, model_path), (img_h, img_w, img_c))
+    # test_img_patches, boxes = random_crop(test_img, crop_size = cropSize, crop_num = crop_num,
+    #                   save = False, saveMode='npy')        
+    # test_img_patches = np.reshape(test_img_patches,list(np.shape(test_img_patches))+[1])
+    # test_img_patches_grad = np.reshape(get_gradients(test_img_patches[:,:,:,0]),(len(boxes), 28, 28, 1))
+    # test_data = np.zeros((len(boxes), 28,28,2))
+
+
+
+    
+def predict_masks_old(test_imgs, crop_num = 5000, model_path = './scadec_Hydra/maskCNN/CNN_mask-2000.meta'):
+    print('computing masks...')
+    img_n, img_h, img_w, img_c = np.shape(test_imgs)
+    masks = np.zeros(np.shape(test_imgs))
+    for imgIdx in range(img_n):
+        masks[imgIdx] = np.reshape(predict_mask(np.squeeze(test_imgs[imgIdx]), crop_num, model_path), (img_h, img_w, img_c))
+    return np.reshape(masks, [img_n, img_h, img_w, 1])
+
+def predict_mask(test_img, crop_num = 5000, model_path = './scadec_Hydra/maskCNN/CNN_mask-2000.meta'):
+    cropSize = (28,28)
+    if len(np.shape(test_img)) == 3:
+        test_img = test_img[:,:,0]
+    
+    test_img_patches, boxes = random_crop(test_img, crop_size = cropSize, crop_num = crop_num,
+                      save = False, saveMode='npy')        
+    test_img_patches = np.reshape(test_img_patches,list(np.shape(test_img_patches))+[1])
+    test_img_patches_grad = np.reshape(get_gradients(test_img_patches[:,:,:,0]),(len(boxes), 28, 28, 1))
+    test_data = np.zeros((len(boxes), 28,28,2))
+            
+    for idx in range(len(boxes)):
+        test_data[idx, :, :, :] = np.concatenate([test_img_patches[idx,:,:], test_img_patches_grad[idx,:,:]], axis = 2)
+    
+    with tf.Session() as sess:
+        new_saver = tf.train.import_meta_graph(model_path)
+        new_saver.restore(sess, '.'.join(model_path.split('.')[:-1]))
+        
+        graph = tf.get_default_graph()
+        xs = graph.get_operation_by_name('xs').outputs[0]
+        pred = graph.get_operation_by_name('pred').outputs[0]            
+        y_pre_raw = sess.run(pred, feed_dict={xs:test_data})
+    
+    # print(y_pre_raw[:50,0])
+    y_pre = y_pre_raw[:,0]>0.9
+    mask = np.zeros(np.shape(test_img))
+    for idx, box in enumerate(boxes):
+        if y_pre[idx] == True:
+            mask[box[0]:box[1],box[2]:box[3]] += 0.01
+    
+    return mask

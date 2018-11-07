@@ -45,6 +45,42 @@ IFDEBUG = False
 #     if IFDEBUG:
 #         print(string)
 
+def get_highPass(img, mode='gradient', paras = {}):
+    if mode == 'gradient':
+        imgY, imgX = tf.image.image_gradients(img)
+        return tf.sqrt(tf.square(imgX)+tf.square(imgY), name='xHighPass')
+    elif mode == 'fft':                        
+        # n, h, w, c = tf.shape(img)
+        n = 5;h = 320; w = 320; c = 1;
+        freq_thershold = paras.get('freq_thershold', int(h/3))
+        img_fft = tf.fft2d(tf.cast(img,tf.complex64))
+        
+        left = freq_thershold;   right = w - freq_thershold
+        up = freq_thershold;     down = h - freq_thershold
+        mask = np.ones([h, w, c])
+        # mask[up:down, left:right, :] = 0
+        # return tf.real(tf.ifft(tf.multiply(img_fft, mask)))
+        return tf.real(tf.ifft(tf.fft(tf.cast(img, tf.complex64))))
+
+def get_lowPass(img, mode='average', paras = {}):
+    if mode =='average':
+        size = paras.get('size', 7)
+        lowPassFilter_C3 = tf.constant(1/size**2, shape=[size, size, 3, 3], name='lowPass_filter_C1')
+        return tf.nn.conv2d(img, lowPassFilter_C3, strides = [1,1,1,1], padding='SAME', name = 'xlowPass')
+    elif mode == 'fft':
+        # n, h, w, c = img.shape
+        n = 5;h = 320; w = 320; c = 1;
+        freq_thershold = paras.get('freq_thershold', int(h/3))
+        img_fft = tf.fft2d(tf.cast(img,tf.complex64))
+        
+        left = freq_thershold;   right = w - freq_thershold
+        up = freq_thershold;     down = h - freq_thershold
+        mask = np.ones([h, w, c])
+        # mask = np.zeros([h, w, c])
+        # mask[up:down, left:right, :] = 1
+        # return tf.real(tf.ifft(tf.multiply(img_fft, mask)))
+        return tf.real(tf.ifft(tf.fft(tf.cast(img, tf.complex64))))
+
 class Unet_bn(object):
     """
     A unet implementation
@@ -131,30 +167,19 @@ class Unet_bn(object):
                 
                 # lowPassFilter_np = np.ones((3,3))/9
                 # lowPassFilter_tf = tf.constant_initializer(value=lowPassFilter_np, dtype=tf.float32)
-                def get_gradient(img):
-                    # gradX = tf.reshape(tf.constant([[0,0,0],[1,0,-1],[0,0,0]],tf.float32),[3, 3, 1, 1])
-                    # gradY = tf.reshape(tf.constant([[0,1,0],[0,0,0],[0,-1,0]],tf.float32),[3, 3, 1, 1])
-                    # imgX = tf.nn.conv2d(img, gradX, strides=[1,1,1,1], padding='SAME')
-                    # imgY = tf.nn.conv2d(img, gradY, strides=[1,1,1,1], padding='SAME')
-                    # print(img.shape)
-                    imgY, imgX = tf.image.image_gradients(img)
-                    return tf.sqrt(tf.square(imgX)+tf.square(imgY), name='xHighPass')
                 
-                def get_blured(img, size = 3):
-                    self.lowPassFilter_C3 = tf.constant(1/size**2, shape=[size, size, 3, 3], name='lowPass_filter_C1')
-                    return tf.nn.conv2d(img, self.lowPassFilter_C3, strides = [1,1,1,1], padding='SAME', name = 'xlowPass')
-                    
 
                 
                 # self.xLowPass = tf.nn.conv2d(self.x, self.lowPassFilter_C3, strides = [1,1,1,1], padding='SAME', name = 'xlowPass')
                 # https://datascience.stackexchange.com/questions/19945/tensorflow-can-not-convert-float-into-a-tensor
                 # self.xHighPass = tf.subtract(self.x, self.xLowPass, name = 'xHighPass')
 
-                self.xLowPass = get_blured(self.x, 7)
+                # self.xLowPass = get_lowPass(self.x, paras = {'size':7})
+                self.xLowPass = get_lowPass(self.x, mode='fft')
                 # print('XXXXXXXXXXXXXXXXXXXXXXX')
                 # print(self.x)
                 # print(self.x.shape)
-                self.xHighPass = get_gradient(self.x)
+                self.xHighPass = get_highPass(self.x, mode='fft')
                 # self.xHighPass = self.x
                 # imgY, imgX = tf.image.image_gradients(self.x)
                 # self.xHighPass = tf.sqrt(tf.square(imgX)+tf.square(imgY), name='xHighPass')
@@ -390,28 +415,24 @@ class Unet_bn(object):
             # self.lowPassFilter = tf.constant(1/9, shape=[1, 3, 3, 1], name='lowPass_filter')
             # xLowPass = tf.nn.conv2d(self.x, self.lowPassFilter, strides = [1,1,1,1], padding='SAME', name = 'lowPass')
 
-            def get_gradient(img):
-                # gradX = tf.reshape(tf.constant([[0,0,0],[1,0,-1],[0,0,0]],tf.float32),[3, 3, 1, 1])
-                # gradY = tf.reshape(tf.constant([[0,1,0],[0,0,0],[0,-1,0]],tf.float32),[3, 3, 1, 1])
-                # imgX = tf.nn.conv2d(img, gradX, strides=[1,1,1,1], padding='SAME')
-                # imgY = tf.nn.conv2d(img, gradY, strides=[1,1,1,1], padding='SAME')                    
-                imgY, imgX = tf.image.image_gradients(img)
-                return tf.sqrt(tf.square(imgX)+tf.square(imgY), name='yHighPass')
+            # def get_gradient(img):            
+            #     imgY, imgX = tf.image.image_gradients(img)
+            #     return tf.sqrt(tf.square(imgX)+tf.square(imgY), name='yHighPass')
             
-            def get_blured(img, size = 3):
-                self.lowPassFilter_C1 = tf.constant(1/size**2, shape=[size, size, 1, 1], name='lowPass_filter_C1')
-                return tf.nn.conv2d(img, self.lowPassFilter_C1, strides = [1,1,1,1], padding='SAME', name = 'ylowPass')
+            # def get_blured(img, size = 3):
+            #     self.lowPassFilter_C1 = tf.constant(1/size**2, shape=[size, size, 1, 1], name='lowPass_filter_C1')
+            #     return tf.nn.conv2d(img, self.lowPassFilter_C1, strides = [1,1,1,1], padding='SAME', name = 'ylowPass')
 
             # self.lowPassFilter_C1 = tf.constant(1/9, shape=[3, 3, 1, 1], name='lowPass_filter_C3')
             # yLowPass = tf.nn.conv2d(self.y, self.lowPassFilter_C1, strides = [1,1,1,1], padding='SAME', name = 'ylowPass')
-            self.yLowPass = get_blured(self.y, 7)
+            self.yLowPass = get_lowPass(self.y, mode='fft')
             lowPass_loss_list = [cost_dict_list for cost_dict_list in cost_dict_lists if cost_dict_list[0]=='forLowPass'][0][1:]
             lowPass_loss_dict = get_losses(self.recons_lowPass, self.yLowPass, lowPass_loss_list, prefix='lowPass')
             
             # yHighPass = tf.subtract(self.y, yLowPass, name = 'yHighPass')
             # print('YYYYYYYYYYYYYYYYYYYYYYY')
             # print(self.y)
-            self.yHighPass = get_gradient(self.y)
+            self.yHighPass = get_highPass(self.y, mode='fft')
             highPass_loss_list = [cost_dict_list for cost_dict_list in cost_dict_lists if cost_dict_list[0]=='forHighPass'][0][1:]
             highPass_loss_dict = get_losses(self.recons_highPass, self.yHighPass, highPass_loss_list, prefix='highPass')
             # print(highPass_loss_dict.keys())

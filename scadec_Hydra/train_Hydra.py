@@ -234,7 +234,7 @@ class Trainer_bn(object):
             logging.info("Start optimization")
 
             # select validation dataset
-            valid_x, valid_y, vbatch_cls = valid_provider(valid_size, fix=True)
+            valid_x, valid_y, vbatch_cls, vbatch_masks = valid_provider(valid_size, fix=True)
             if SAVE_MODE == 'Original':
                 util.save_mat(valid_y, "%s/%s.mat"%(self.prediction_path, 'origin_y'))
                 util.save_mat(valid_x, "%s/%s.mat"%(self.prediction_path, 'origin_x'))
@@ -242,6 +242,7 @@ class Trainer_bn(object):
             elif SAVE_MODE == 'Xiaojian':
                 imgx = util.concat_n_images(valid_x)
                 imgy = util.concat_n_images(valid_y)
+                imgMasks = util.concat_n_images(vbatch_masks)
 
                 batch_cls_str = ['cls: '+ str(clas) for clas in list(vbatch_cls.argmax(1))]
                 batch_outputs_psnr_str = ['PSNR: '+str(psnr) for psnr in list(util.computePSNRs(imgy, imgx))]
@@ -252,6 +253,7 @@ class Trainer_bn(object):
 
                 util.save_img(imgx, "%s/%s_img.png"%(self.prediction_path, 'trainOb'))
                 util.save_img(imgy, "%s/%s_img.png"%(self.prediction_path, 'trainGt'))
+                util.save_img(imgMasks, "%s/%s_img.png"%(self.prediction_path, 'trainMasks'))
 
             # pprint.pprint([var.name for var in tf.trainable_variables()])
             # Pre-training discrminnator
@@ -282,7 +284,9 @@ class Trainer_bn(object):
                 for step in range((epoch*training_iters), ((epoch+1)*training_iters)):
                     # print('data_provider.onehot_cls')
                     # print(data_provider.onehot_cls)
-                    batch_x, batch_y, batch_cls = data_provider(self.batch_size)
+                    batch_x, batch_y, batch_cls, batch_masks = data_provider(self.batch_size)
+                    # print(type(batch_masks))
+                    # print(np.shape(batch_masks))
                     util.verbose_print('batch_cls in train', self.verbose)
                     util.verbose_print(batch_cls, self.verbose)
 
@@ -299,6 +303,7 @@ class Trainer_bn(object):
                                                             feed_dict={self.net.x: batch_x,
                                                                         self.net.y: batch_y,
                                                                         self.net.batch_cls: batch_cls,
+                                                                        self.net.batch_masks: batch_masks,
                                                                         self.net.current_epoch: epoch,
                                                                         self.net.total_epochs: epochs,
                                                                         self.net.keep_prob: dropout,
@@ -312,6 +317,7 @@ class Trainer_bn(object):
                                                             feed_dict={self.net.x: batch_x,
                                                                         self.net.y: batch_y,
                                                                         self.net.batch_cls: batch_cls,
+                                                                        self.net.batch_masks: batch_masks,
                                                                         self.net.current_epoch: epoch,
                                                                         self.net.total_epochs: epochs,
                                                                         self.net.keep_prob: dropout,
@@ -322,7 +328,7 @@ class Trainer_bn(object):
                         # Changed here - Xing
                         # logging.info("Iter {:}".format(step))
                         logging.info("Iter {:} (before training on the batch)\tMinibatch MSE= {:.4f},\tMinibatch Avg PSNR= {:.4f}".format(step, loss, avg_psnr))
-                        self.output_minibatch_stats(sess, summary_writer, step, batch_x, batch_y, batch_cls, epoch)
+                        self.output_minibatch_stats(sess, summary_writer, step, batch_x, batch_y, batch_cls, batch_masks, epoch)
                         
                     total_loss += loss
 
@@ -334,14 +340,14 @@ class Trainer_bn(object):
 
                 # output statistics for epoch
                 self.output_epoch_stats(epoch, total_loss/training_iters, training_iters, lr)
-                self.output_valstats(sess, summary_writer, step, valid_x, valid_y, vbatch_cls, "epoch_%s_valid"%epoch, epoch, store_img=True)
+                self.output_valstats(sess, summary_writer, step, valid_x, valid_y, vbatch_cls, vbatch_masks, "epoch_%s_valid"%epoch, epoch, store_img=True)
                 # Xing
                 if SAVE_TRAIN_PRED:
                     if SAVE_MODE == 'Original':
                         util.save_img(train_output[0,...], "%s/%s_img.tif"%(self.prediction_path, "epoch_%s_train"%epoch))
                     elif SAVE_MODE == 'Xiaojian':
                         # Xiaojian's code
-                        self.output_train_batch_stats(sess, epoch, batch_x, batch_y, batch_cls, epoch)
+                        self.output_train_batch_stats(sess, epoch, batch_x, batch_y, batch_cls, batch_masks, epoch)
 
                 if epoch % save_epoch == 0:
                     directory = os.path.join(output_path, "{}_cpkt/".format(step))
@@ -364,7 +370,7 @@ class Trainer_bn(object):
             logging.info("Epoch {:}, Average MSE: {:.4f}, learning rate: {:.4f}".format(epoch, (total_loss / training_iters), lr))
         
     
-    def output_minibatch_stats(self, sess, summary_writer, step, batch_x, batch_y, batch_cls, current_epoch):
+    def output_minibatch_stats(self, sess, summary_writer, step, batch_x, batch_y, batch_cls, batch_masks, current_epoch):
         # Calculate batch loss and accuracy
         loss, predictions, avg_psnr = sess.run([self.net.loss,  
                                                 self.net.recons,
@@ -372,6 +378,7 @@ class Trainer_bn(object):
                                                 feed_dict={self.net.x: batch_x,
                                                             self.net.y: batch_y,
                                                             self.net.batch_cls: batch_cls,
+                                                            self.net.batch_masks: batch_masks,
                                                             self.net.current_epoch: current_epoch,
                                                             self.net.total_epochs: self.total_epochs,
                                                             self.net.keep_prob: 1.,
@@ -386,7 +393,7 @@ class Trainer_bn(object):
         else:
             logging.info("Iter {:} (After training on the batch)\tMinibatch MSE= {:.4f},\tMinibatch Avg PSNR= {:.4f}".format(step,loss,avg_psnr))
 
-    def output_train_batch_stats(self, sess, epoch, batch_x, batch_y, batch_cls, current_epoch):
+    def output_train_batch_stats(self, sess, epoch, batch_x, batch_y, batch_cls, batch_masks, current_epoch):
         # Xing
         # Calculate batch loss and accuracy
         loss, predictions, avg_psnr = sess.run([self.net.loss,  
@@ -395,6 +402,7 @@ class Trainer_bn(object):
                                                 feed_dict={self.net.x: batch_x,
                                                             self.net.y: batch_y,
                                                             self.net.batch_cls: batch_cls,
+                                                            self.net.batch_masks: batch_masks,
                                                             self.net.current_epoch: current_epoch,
                                                             self.net.total_epochs: self.total_epochs,
                                                             self.net.keep_prob: 1.,
@@ -402,6 +410,7 @@ class Trainer_bn(object):
         train_inputs = util.concat_n_images(batch_x)
         train_outputs = util.concat_n_images(predictions)
         train_targets = util.concat_n_images(batch_y)
+        train_masks = util.concat_n_images(batch_masks)
         
         batch_cls_str = ['cls: '+ str(clas) for clas in list(batch_cls.argmax(1))]
         batch_inputs_psnr_str = ['PSNR: '+str(psnr)  for psnr in list(util.computePSNRs(train_targets, train_inputs))]
@@ -418,8 +427,9 @@ class Trainer_bn(object):
         util.save_img(train_inputs, "%s/%s_img.png"%(self.prediction_path, "epoch_%s_train_inputs"%epoch))
         util.save_img(train_outputs, "%s/%s_img.png"%(self.prediction_path, "epoch_%s_train_outputs"%epoch))
         util.save_img(train_targets, "%s/%s_img.png"%(self.prediction_path, "epoch_%s_train_targets"%epoch))
+        util.save_img(train_masks, "%s/%s_img.png"%(self.prediction_path, "epoch_%s_train_masks"%epoch))
 
-    def output_valstats(self, sess, summary_writer, step, batch_x, batch_y, batch_cls, name, current_epoch, store_img=True):
+    def output_valstats(self, sess, summary_writer, step, batch_x, batch_y, batch_cls, batch_masks, name, current_epoch, store_img=True):
         
         prediction, loss_dict, avg_psnr = sess.run([self.net.recons,
                                                 self.net.valid_loss_dict,
@@ -427,6 +437,7 @@ class Trainer_bn(object):
                                                 feed_dict={self.net.x: batch_x, 
                                                             self.net.y: batch_y,
                                                             self.net.batch_cls: batch_cls,
+                                                            self.net.batch_masks:batch_masks,
                                                             self.net.current_epoch: current_epoch,
                                                             self.net.total_epochs: self.total_epochs,
                                                             self.net.keep_prob: 1.,

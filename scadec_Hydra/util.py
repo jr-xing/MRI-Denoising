@@ -228,3 +228,18 @@ def concat_n_images(image_mat, batch_cls = None):
 def verbose_print(str, verbose):
     if verbose:
         print(str)
+
+from scipy.signal import convolve2d
+def get_gradients(imgs):    
+    # imgs: [n, h, w]
+    grads = np.zeros(np.shape(imgs))
+    for idx in range(np.shape(imgs)[0]):
+        grads[idx,:,:] = get_gradient(imgs[idx,:,:])
+    return  grads
+
+def get_gradient(img):    
+    gradX = np.array([[0,0,0],[-1,0,1],[0,0,0]])
+    gradY = np.array([[0,1,0],[0,0,0],[0,-1,0]])
+    imgX = convolve2d(img, gradX, mode='same')
+    imgY = convolve2d(img, gradY, mode='same')
+    return  np.sqrt(imgX**2+ imgY**2)
