@@ -416,7 +416,7 @@ def get_data_provider(para_dict_use, mode = 'train', DEBUG_MODE = False):
 
     # print(vdata_cls)
     if para_dict_use.get('preMask', False):
-        vdata_masks = np.load('./scadec_Hydra/maskCNN/pre_computed/vdata_FULL_SEG_28_28_masks.npy')
+        vdata_masks = np.load('..data/masks/vdata_FULL_SEG_28_28_masks.npy')
         # vdata_masks = predict_masks(vtruths, savePatches=False, saveYPre=True, saveMasks=True, saveName='vdata_'+ para_dict_use['Gt'])
         # vdata_masks = predict_masks(vtruths, savePatches=False, loadYPre=True, saveMasks=True, saveName='vdata_'+ para_dict_use['Gt'])
 
@@ -427,9 +427,9 @@ def get_data_provider(para_dict_use, mode = 'train', DEBUG_MODE = False):
             
 
             # data_masks = predict_masks(truths, savePatches=False, saveYPre=True, saveMasks=True, saveName='data_'+ para_dict_use['Gt'])
-            data_masks_1 = np.load('./scadec_Hydra/maskCNN/pre_computed/data_FULL_SEG_1_28_28_masks.npy')
-            data_masks_2 = np.load('./scadec_Hydra/maskCNN/pre_computed/data_FULL_SEG_2_28_28_masks.npy')
-            data_masks_3 = np.load('./scadec_Hydra/maskCNN/pre_computed/data_FULL_SEG_3_28_28_masks.npy')
+            data_masks_1 = np.load('..data/masks/pre_computed/data_FULL_SEG_1_28_28_masks.npy')
+            data_masks_2 = np.load('..data/masks/pre_computed/data_FULL_SEG_2_28_28_masks.npy')
+            data_masks_3 = np.load('..data/masks/pre_computed/data_FULL_SEG_3_28_28_masks.npy')
 
             data_masks  = np.concatenate([data_masks_1, data_masks_2, data_masks_3], axis=0)    
 
@@ -552,6 +552,7 @@ import pickle
 #     return masks
 
 def predict_masks(test_imgs, crop_num = 5000, model_path = './scadec_Hydra/maskCNN/CNN_mask-2000.meta',
+                    save_path = '..data/masks/',
                     saveName = 'patches', loadName = 'patches',
                     savePatches = False, loadPatches = False,
                     saveYPre = False, loadYPre = False,
@@ -581,7 +582,7 @@ def predict_masks(test_imgs, crop_num = 5000, model_path = './scadec_Hydra/maskC
         # Get patches
         print('Getting patches...')
         if loadPatches:
-            patches, boxeses = np.load('./scadec_Hydra/maskCNN/pre_computed/{}_{}_{}_patches_boxeses.npy'.format(loadName, cropSize[0], cropSize[1]))
+            patches, boxeses = np.load(save_path + '{}_{}_{}_patches_boxeses.npy'.format(loadName, cropSize[0], cropSize[1]))
             # with open('./scadec_Hydra/maskCNN/pre_computed/{}.pkl'.format(loadName), 'rb') as f:  # Python 3: open(..., 'wb')
             #     data = pickle.load(f)
         elif (not loadYPre) and (not loadMaskes):
@@ -605,13 +606,13 @@ def predict_masks(test_imgs, crop_num = 5000, model_path = './scadec_Hydra/maskC
         if savePatches:
             print('Saving...')
             # np.save('./scadec_Hydra/maskCNN/pre_computed/{}_{}_{}_patches_boxeses'.format(saveName, cropSize[0], cropSize[1]), [patches, boxeses])
-            np.save('./scadec_Hydra/maskCNN/pre_computed/{}_{}_{}_patches'.format(saveName, cropSize[0], cropSize[1]), patches)
+            np.save(save_path + '{}_{}_{}_patches'.format(saveName, cropSize[0], cropSize[1]), patches)
 
         # Get Predictions
         print('Predicting...')
         if loadYPre:
-            y_pre_raws = np.load('./scadec_Hydra/maskCNN/pre_computed/{}_{}_{}_ypre.npy'.format(saveName, cropSize[0], cropSize[1]))
-            boxeses = np.load('./scadec_Hydra/maskCNN/pre_computed/{}_{}_{}_boxeses.npy'.format(saveName, cropSize[0], cropSize[1]))
+            y_pre_raws = np.load(save_path + '{}_{}_{}_ypre.npy'.format(saveName, cropSize[0], cropSize[1]))
+            boxeses = np.load(save_path + '{}_{}_{}_boxeses.npy'.format(saveName, cropSize[0], cropSize[1]))
         elif not loadMaskes:
             y_pre_raws = []
             for imgIdx in tqdm(range(img_n),ncols=75):
@@ -619,8 +620,8 @@ def predict_masks(test_imgs, crop_num = 5000, model_path = './scadec_Hydra/maskC
         
             # a = 1
         if saveYPre:
-            np.save('./scadec_Hydra/maskCNN/pre_computed/{}_{}_{}_ypre.npy'.format(saveName, cropSize[0], cropSize[1]), y_pre_raws)
-            np.save('./scadec_Hydra/maskCNN/pre_computed/{}_{}_{}_boxeses.npy'.format(saveName, cropSize[0], cropSize[1]), boxeses)
+            np.save(save_path + '{}_{}_{}_ypre.npy'.format(saveName, cropSize[0], cropSize[1]), y_pre_raws)
+            np.save(save_path + '{}_{}_{}_boxeses.npy'.format(saveName, cropSize[0], cropSize[1]), boxeses)
         
         # Get masks
         # y_pres = []
@@ -634,7 +635,7 @@ def predict_masks(test_imgs, crop_num = 5000, model_path = './scadec_Hydra/maskC
                     mask[box[0]:box[1],box[2]:box[3]] += 0.01
             masks[imgIdx] = np.reshape(mask, [img_h, img_w, img_c])
         if saveMasks:
-            np.save('./scadec_Hydra/maskCNN/pre_computed/{}_{}_{}_masks'.format(saveName, cropSize[0], cropSize[1]), masks)
+            np.save(save_path + '{}_{}_{}_masks'.format(saveName, cropSize[0], cropSize[1]), masks)
         endTime = time.time()
         print('Finished computing masks for {} within {} mins for {} images!'.format(saveName, (endTime - startTime)/60, img_n))
     return masks
