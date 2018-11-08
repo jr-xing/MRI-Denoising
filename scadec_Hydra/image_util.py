@@ -113,8 +113,17 @@ class SimpleDataProvider(BaseDataProvider):
         # Get masks
         masks = np.ones((n, nx, ny, self.truth_channels))
         if self.masks is not None:
-            for i in range(n):
-                masks[i] = self.masks[idx[i]]
+            for i in range(n):                
+                # masks[i] = self.masks[idx[i]]
+                # Normalize masks
+                mask_min = np.min(self.masks[idx[i]])
+                mask_max = np.max(self.masks[idx[i]] - mask_min)
+                if mask_max != 0:
+                    masks[i] = (self.masks[idx[i]]-mask_min)/mask_max
+                if np.sum(np.isnan(masks[i]))!=0:
+                    print('NAN!')
+                    print('MASK_MIN: ' + str(mask_min))
+                    print('MASK_MAX: ' + str(mask_max))
 
             # mask = predict_mask()
 
@@ -157,6 +166,16 @@ class SimpleDataProvider(BaseDataProvider):
         if self.masks is not None:
             for i in range(n):
                 masks[i] = self.masks[i]
+                # Normalize masks
+                mask_min = np.min(self.masks[i])
+                mask_max = np.max(self.masks[i] - mask_min)
+                if mask_max != 0:
+                    masks[i] = (self.masks[i]-mask_min)/mask_max
+                if np.sum(np.isnan(masks[i]))!=0:
+                    print('NAN!')
+                    print('MASK_MIN: ' + str(mask_min))
+                    print('MASK_MAX: ' + str(mask_max))
+                # print(np.isnan(masks[i]))
 
         return X, Y, batch_cls, masks
 
@@ -417,7 +436,8 @@ def get_data_provider(para_dict_use, mode = 'train', DEBUG_MODE = False):
 
     # print(vdata_cls)
     if para_dict_use.get('preMask', False):
-        vdata_masks = np.load('..data/masks/vdata_FULL_SEG_28_28_masks.npy')
+        print('Loading vmasks...')
+        vdata_masks = np.load('../data/masks/vdata_FULL_SEG_28_28_masks.npy')
         # vdata_masks = predict_masks(vtruths, savePatches=False, saveYPre=True, saveMasks=True, saveName='vdata_'+ para_dict_use['Gt'])
         # vdata_masks = predict_masks(vtruths, savePatches=False, loadYPre=True, saveMasks=True, saveName='vdata_'+ para_dict_use['Gt'])
 
@@ -428,11 +448,15 @@ def get_data_provider(para_dict_use, mode = 'train', DEBUG_MODE = False):
             
 
             # data_masks = predict_masks(truths, savePatches=False, saveYPre=True, saveMasks=True, saveName='data_'+ para_dict_use['Gt'])
-            data_masks_1 = np.load('..data/masks/pre_computed/data_FULL_SEG_1_28_28_masks.npy')
-            data_masks_2 = np.load('..data/masks/pre_computed/data_FULL_SEG_2_28_28_masks.npy')
-            data_masks_3 = np.load('..data/masks/pre_computed/data_FULL_SEG_3_28_28_masks.npy')
+            print('Loading masks...')
+            if DEBUG_MODE:
+                data_masks = np.load('../data/masks_debug/data_FULL_SEG_28_28_masks.npy')
+            else:
+                data_masks_1 = np.load('../data/masks/data_FULL_SEG_1_28_28_masks.npy')
+                data_masks_2 = np.load('../data/masks/data_FULL_SEG_2_28_28_masks.npy')
+                data_masks_3 = np.load('../data/masks/data_FULL_SEG_3_28_28_masks.npy')
 
-            data_masks  = np.concatenate([data_masks_1, data_masks_2, data_masks_3], axis=0)    
+                data_masks  = np.concatenate([data_masks_1, data_masks_2, data_masks_3], axis=0)    
 
             # data_masks = predict_masks(truths, savePatches=False, loadYPre=True, saveMasks=True, saveName='data_'+ para_dict_use['Gt'])
         else:

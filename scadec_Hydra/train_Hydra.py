@@ -251,6 +251,8 @@ class Trainer_bn(object):
                 imgx = util.noteTexts2Imgs(imgx, batch_outputs_str)
                 imgy = util.noteTexts2Imgs(imgy, batch_targets_str)
 
+                if len(np.shape(imgx)) == 3:
+                    util.save_img(imgx[:,:,1], "%s/%s_img.png"%(self.prediction_path, 'trainOb_single'))
                 util.save_img(imgx, "%s/%s_img.png"%(self.prediction_path, 'trainOb'))
                 util.save_img(imgy, "%s/%s_img.png"%(self.prediction_path, 'trainGt'))
                 util.save_img(imgMasks, "%s/%s_img.png"%(self.prediction_path, 'trainMasks'))
