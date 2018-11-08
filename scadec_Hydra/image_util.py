@@ -302,6 +302,7 @@ def assign_silce_idx(total_count, binSliceStart=1, binSliceEnd=96):
 
 def get_data_provider(para_dict_use, mode = 'train', DEBUG_MODE = False):
     # data_cls_num = para_dict_use['kwargs'].get('n_classes',1)
+    print(para_dict_use['kwargs'])
     if type(para_dict_use['kwargs']['structure']) == str:
         data_cls_num = para_dict_use['kwargs'].get('n_classes',1)
     else:
