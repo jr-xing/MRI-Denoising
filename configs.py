@@ -1912,7 +1912,7 @@ para_dict_58 = {
     },
     {
         "name":"highPass",
-        "layers": 5,           # how many resolution levels we want to have
+        "layers": 4,           # how many resolution levels we want to have
         "conv_times": 2,       # how many times we want to convolve in each level
         "features_root": 32,   # how many feature_maps we want to have as root (the following levels will calculate the feature_map by multiply by 2, exp, 64, 128, 256)
         "filter_size": 5,      # filter size used in convolution
@@ -1930,8 +1930,8 @@ para_dict_58 = {
     },
     'epochs':200,
     'optimizer': 'adam',
-    'server': '1',
-    'GPU_IND':'2'
+    'server': '2',
+    'GPU_IND':'3'
 }
 
 # re-run 51 without some classes
@@ -2150,10 +2150,10 @@ para_dict_62 = {
 
 #para_dict_use = para_dict_42
 #para_str_use = para_str_42
-# para_dict_use_train = para_dict_58
-# para_str_use_train = para_str_58
-para_dict_use_train = para_dict_62
-para_str_use_train = para_str_62
+para_dict_use_train = para_dict_58
+para_str_use_train = para_str_58
+# para_dict_use_train = para_dict_62
+# para_str_use_train = para_str_62
 
 para_dict_use_test = para_dict_46
 para_str_use_test = para_str_46

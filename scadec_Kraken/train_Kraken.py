@@ -434,6 +434,10 @@ class Trainer_bn(object):
         util.save_img(train_inputs, "%s/%s_img.png"%(self.prediction_path, "epoch_%s_train_inputs"%epoch))
         util.save_img(train_inputs_LP, "%s/%s_img_LP.png"%(self.prediction_path, "epoch_%s_train_inputs"%epoch))
         util.save_img(train_inputs_HP, "%s/%s_img_HP.png"%(self.prediction_path, "epoch_%s_train_inputs"%epoch))
+        
+        util.save_mat(batch_xHP, "%s/%s_img_HP.mat"%(self.prediction_path, "epoch_%s_train_inputs"%epoch))
+        util.save_mat(batch_xLP, "%s/%s_img_LP.mat"%(self.prediction_path, "epoch_%s_train_inputs"%epoch))
+
         util.save_img(train_outputs, "%s/%s_img.png"%(self.prediction_path, "epoch_%s_train_outputs"%epoch))
         util.save_img(train_outputs_LP, "%s/%s_img_LP.png"%(self.prediction_path, "epoch_%s_train_outputs"%epoch))
         util.save_img(train_outputs_HP, "%s/%s_img_HP.png"%(self.prediction_path, "epoch_%s_train_outputs"%epoch))

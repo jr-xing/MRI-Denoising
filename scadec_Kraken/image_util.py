@@ -307,13 +307,20 @@ def get_data_provider(para_dict_use, mode = 'train', DEBUG_MODE = False):
             if 'motion' in para_dict_use['Ob']:
                 if ('FULL_SEG' in para_dict_use['Ob']):            
                     if mode == 'train':
-                        data = h5py_mat2npy('../data/train_np/traOb_FULL_SEG_neigh_motion_part_2.mat')
+                        data = h5py_mat2npy('../data/train_np/traOb_FULL_SEG_neigh_motion_part_2.mat')#[:,:,:,1]
+                        # dn, dh, dw = np.shape(data)
+                        # data = np.reshape(data, [dn,dh,dw,1])
+                        # data_channels = 1
+                        # print(np.shape(data))
                         data_cls = idx_classify(assign_silce_idx(np.shape(data)[0]),n_classes = data_cls_num, mode='equally')
                         #data_cls = idx_classify(np.arange(100, 245+1, 5), mode='equally_960')
                     elif mode == 'test' or mode == 'valid':
                         data = None
                     
-                    vdata = h5py_mat2npy('../data/valid_np/valOb_neigh_motion.mat')
+                    vdata = h5py_mat2npy('../data/valid_np/valOb_neigh_motion.mat')#[:,:,:,1]
+                    # vdn, vdh, vdw = np.shape(vdata)
+                    # vdata = np.reshape(vdata, [vdn,vdh,vdw,1])
+                    # print(np.shape(vdata))
                     # vdata_cls = idx_classify(assign_silce_idx(np.shape(vdata)[0]), mode='equally_960')
                     vdata_idx = np.arange(100, 245+1, 5)%96
                     vdata_idx[vdata_idx==0] = 96
@@ -350,7 +357,7 @@ def get_data_provider(para_dict_use, mode = 'train', DEBUG_MODE = False):
                         data1 = h5py_mat2npy('../data/train_np/traOb_FULL_SEG_neigh_motion_part_1.mat')
                         data2 = h5py_mat2npy('../data/train_np/traOb_FULL_SEG_neigh_motion_part_2.mat')
                         data3 = h5py_mat2npy('../data/train_np/traOb_FULL_SEG_neigh_motion_part_3.mat')
-                        data  = np.concatenate([data1, data2, data3], axis=0)    
+                        data  = np.concatenate([data1, data2, data3], axis=0)
                         data_cls = idx_classify(assign_silce_idx(np.shape(data)[0]), n_classes = data_cls_num, mode='equally')
                         # print('Observation_size')
                         # print(np.shape(data)[0])
@@ -407,6 +414,7 @@ def get_data_provider(para_dict_use, mode = 'train', DEBUG_MODE = False):
         data_provider = None 
     else:
         raise ValueError('Unknow mode' + mode)
+        
     
     valid_provider = SimpleDataProvider(vdata, vtruths, data_cls = vdata_cls, data_cls_num=data_cls_num, process_dict = para_dict_use['proc_dict'], onehot_cls=True, verbose=False)
     return data_provider, valid_provider, data_channels, truth_channels, training_iters

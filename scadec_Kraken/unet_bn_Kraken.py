@@ -44,7 +44,7 @@ IFDEBUG = False
 #     global IFDEBUG
 #     if IFDEBUG:
 #         print(string)
-
+import matplotlib.pyplot as plt
 def get_highPass(img, mode='gradient', paras = {}):
     if mode == 'gradient':
         imgY, imgX = tf.image.image_gradients(img)
@@ -52,15 +52,21 @@ def get_highPass(img, mode='gradient', paras = {}):
     elif mode == 'fft':                        
         # n, h, w, c = tf.shape(img)
         n = 5;h = 320; w = 320; c = 1;
-        freq_thershold = paras.get('freq_thershold', int(h/3))
+        # freq_thershold = paras.get('freq_thershold', int(h/3))
+        # freq_thershold = int(h/3)
+        freq_thershold = h-20
+        # img = tf.reshape(img[:,:,:,0], [5, 320,320,1])
         img_fft = tf.fft2d(tf.cast(img,tf.complex64))
         
         left = freq_thershold;   right = w - freq_thershold
         up = freq_thershold;     down = h - freq_thershold
         mask = np.ones([h, w, c])
-        # mask[up:down, left:right, :] = 0
-        # return tf.real(tf.ifft(tf.multiply(img_fft, mask)))
-        return tf.real(tf.ifft(tf.fft(tf.cast(img, tf.complex64))))
+        mask[up:down, left:right, :] = 0
+        # plt.imsave('./highPass_mask.png', mask, cmap='gray')
+        # plt.imsave('./highPass_masked.png', mask, cmap='gray')
+        return tf.real(tf.ifft2d(tf.multiply(img_fft, mask)))
+        # return tf.ifft(tf.multiply(img_fft, mask))
+        # return tf.real(tf.ifft(tf.fft(tf.cast(img, tf.complex64))))
 
 def get_lowPass(img, mode='average', paras = {}):
     if mode =='average':
@@ -70,16 +76,19 @@ def get_lowPass(img, mode='average', paras = {}):
     elif mode == 'fft':
         # n, h, w, c = img.shape
         n = 5;h = 320; w = 320; c = 1;
-        freq_thershold = paras.get('freq_thershold', int(h/3))
+        # img = tf.reshape(img[:,:,:,0], [5, 320,320,1])
+        # freq_thershold = paras.get('freq_thershold', int(h/3))
+        freq_thershold = 20
         img_fft = tf.fft2d(tf.cast(img,tf.complex64))
         
         left = freq_thershold;   right = w - freq_thershold
         up = freq_thershold;     down = h - freq_thershold
-        mask = np.ones([h, w, c])
-        # mask = np.zeros([h, w, c])
-        # mask[up:down, left:right, :] = 1
-        # return tf.real(tf.ifft(tf.multiply(img_fft, mask)))
-        return tf.real(tf.ifft(tf.fft(tf.cast(img, tf.complex64))))
+        # mask = np.ones([h, w, c])
+        mask = np.zeros([h, w, c])
+        mask[up:down, left:right, :] = 1
+        return tf.real(tf.ifft2d(tf.multiply(img_fft, mask)))
+        # return tf.ifft(tf.multiply(img_fft, mask))
+        # return tf.real(tf.ifft(tf.fft(tf.cast(img, tf.complex64))))
 
 class Unet_bn(object):
     """
