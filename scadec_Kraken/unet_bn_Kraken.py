@@ -45,6 +45,25 @@ IFDEBUG = False
 #     if IFDEBUG:
 #         print(string)
 import matplotlib.pyplot as plt
+from scipy.stats import multivariate_normal
+def get_Gaussian_mask(scaleX=1, scaleY=1, X=320, Y=320):       
+    """
+    Gaussian Low Pass Mask
+    Args:
+        scaleX, scaleY: Scale of axis X and Y. 
+                        Larger scale refers to more low frequency information
+        X, Y: Size of mask
+    
+    """
+    x, y = np.mgrid[-1:1:2/X, -1:1:2/Y]
+    pos = np.empty(x.shape + (2,))
+    pos[:, :, 0] = x; pos[:, :, 1] = y
+    rv = multivariate_normal([0, 0], [[scaleX, 0], [0, scaleY]])
+    maskN = rv.pdf(pos)    
+    maskN = (maskN-np.min(maskN))/(np.max(maskN)-np.min(maskN))
+    maskN = np.fft.fftshift(maskN)
+    return np.reshape(maskN, [1, Y, X, 1])
+
 def get_highPass(img, mode='gradient', paras = {}):
     if mode == 'gradient':
         imgY, imgX = tf.image.image_gradients(img)
@@ -53,20 +72,32 @@ def get_highPass(img, mode='gradient', paras = {}):
         # n, h, w, c = tf.shape(img)
         n = 5;h = 320; w = 320; c = 1;
         # freq_thershold = paras.get('freq_thershold', int(h/3))
-        # freq_thershold = int(h/3)
-        freq_thershold = h-20
+        # # freq_thershold = int(h/3)
+        freq_thershold = 8
         # img = tf.reshape(img[:,:,:,0], [5, 320,320,1])
-        img_fft = tf.fft2d(tf.cast(img,tf.complex64))
+        img_fft = tf.fft3d(tf.cast(img,tf.complex64))
         
-        left = freq_thershold;   right = w - freq_thershold
-        up = freq_thershold;     down = h - freq_thershold
-        mask = np.ones([h, w, c])
-        mask[up:down, left:right, :] = 0
+        # left = freq_thershold;   right = w - freq_thershold
+        # up = freq_thershold;     down = h - freq_thershold
+        mask = np.zeros((h,w,c))
+        mask[freq_thershold:h-freq_thershold, :, :] = 1
+        mask[:, freq_thershold:w-freq_thershold, :] = 1
+        # maskHP = np.zeros((h, w))
+        # maskHP[freqThreshold_HP:h-freqThreshold_HP, :] = 1
+        # maskHP[:, freqThreshold_HP:w-freqThreshold_HP] = 1
+        # mask = np.ones([h, w, c])
+        # mask[up:down, left:right, :] = 0
         # plt.imsave('./highPass_mask.png', mask, cmap='gray')
         # plt.imsave('./highPass_masked.png', mask, cmap='gray')
-        return tf.real(tf.ifft2d(tf.multiply(img_fft, mask)))
+        return tf.real(tf.ifft3d(tf.multiply(img_fft, mask)))
         # return tf.ifft(tf.multiply(img_fft, mask))
         # return tf.real(tf.ifft(tf.fft(tf.cast(img, tf.complex64))))
+    elif mode == 'fft_Gaussian':
+        mask = 1 - get_Gaussian_mask(0.007, 0.001, 320, 320)
+        img_fft = tf.fft3d(tf.cast(img,tf.complex64))
+        return tf.real(tf.ifft3d(tf.multiply(img_fft, mask)))
+
+
 
 def get_lowPass(img, mode='average', paras = {}):
     if mode =='average':
@@ -78,17 +109,24 @@ def get_lowPass(img, mode='average', paras = {}):
         n = 5;h = 320; w = 320; c = 1;
         # img = tf.reshape(img[:,:,:,0], [5, 320,320,1])
         # freq_thershold = paras.get('freq_thershold', int(h/3))
-        freq_thershold = 20
-        img_fft = tf.fft2d(tf.cast(img,tf.complex64))
+        freq_thershold = 8
+        img_fft = tf.fft3d(tf.cast(img,tf.complex64))
         
-        left = freq_thershold;   right = w - freq_thershold
-        up = freq_thershold;     down = h - freq_thershold
+        # left = freq_thershold;   right = w - freq_thershold
+        # up = freq_thershold;     down = h - freq_thershold
         # mask = np.ones([h, w, c])
-        mask = np.zeros([h, w, c])
-        mask[up:down, left:right, :] = 1
-        return tf.real(tf.ifft2d(tf.multiply(img_fft, mask)))
+        # mask = np.zeros([h, w, c])
+        # mask[up:down, left:right, :] = 1
+        mask = np.ones((h,w,c))
+        mask[freq_thershold:h-freq_thershold, :, :] = 0
+        mask[:, freq_thershold:w-freq_thershold, :] = 0
+        return tf.real(tf.ifft3d(tf.multiply(img_fft, mask)))
         # return tf.ifft(tf.multiply(img_fft, mask))
         # return tf.real(tf.ifft(tf.fft(tf.cast(img, tf.complex64))))
+    elif mode == 'fft_Gaussian':
+        mask = get_Gaussian_mask(0.007, 0.001, 320, 320)
+        img_fft = tf.fft3d(tf.cast(img,tf.complex64))
+        return tf.real(tf.ifft3d(tf.multiply(img_fft, mask)))
 
 class Unet_bn(object):
     """
@@ -184,11 +222,11 @@ class Unet_bn(object):
                 # self.xHighPass = tf.subtract(self.x, self.xLowPass, name = 'xHighPass')
 
                 # self.xLowPass = get_lowPass(self.x, paras = {'size':7})
-                self.xLowPass = get_lowPass(self.x, mode='fft')
+                self.xLowPass = get_lowPass(self.x, mode='fft_Gaussian')
                 # print('XXXXXXXXXXXXXXXXXXXXXXX')
                 # print(self.x)
                 # print(self.x.shape)
-                self.xHighPass = get_highPass(self.x, mode='fft')
+                self.xHighPass = get_highPass(self.x, mode='fft_Gaussian')
                 # self.xHighPass = self.x
                 # imgY, imgX = tf.image.image_gradients(self.x)
                 # self.xHighPass = tf.sqrt(tf.square(imgX)+tf.square(imgY), name='xHighPass')
@@ -434,14 +472,14 @@ class Unet_bn(object):
 
             # self.lowPassFilter_C1 = tf.constant(1/9, shape=[3, 3, 1, 1], name='lowPass_filter_C3')
             # yLowPass = tf.nn.conv2d(self.y, self.lowPassFilter_C1, strides = [1,1,1,1], padding='SAME', name = 'ylowPass')
-            self.yLowPass = get_lowPass(self.y, mode='fft')
+            self.yLowPass = get_lowPass(self.y, mode='fft_Gaussian')
             lowPass_loss_list = [cost_dict_list for cost_dict_list in cost_dict_lists if cost_dict_list[0]=='forLowPass'][0][1:]
             lowPass_loss_dict = get_losses(self.recons_lowPass, self.yLowPass, lowPass_loss_list, prefix='lowPass')
             
             # yHighPass = tf.subtract(self.y, yLowPass, name = 'yHighPass')
             # print('YYYYYYYYYYYYYYYYYYYYYYY')
             # print(self.y)
-            self.yHighPass = get_highPass(self.y, mode='fft')
+            self.yHighPass = get_highPass(self.y, mode='fft_Gaussian')
             highPass_loss_list = [cost_dict_list for cost_dict_list in cost_dict_lists if cost_dict_list[0]=='forHighPass'][0][1:]
             highPass_loss_dict = get_losses(self.recons_highPass, self.yHighPass, highPass_loss_list, prefix='highPass')
             # print(highPass_loss_dict.keys())

@@ -13,7 +13,7 @@ os.environ['CUDA_VISIBLE_DEVICES'] = gpu_ind # 0,1,2,3
 
 #%% Load data
 from scadec_Kraken.image_util import get_data_provider
-data_provider, valid_provider, data_channels, truth_channels, training_iters = get_data_provider(para_dict_use_train, 'train', DEBUG_MODE=True)
+data_provider, valid_provider, data_channels, truth_channels, training_iters = get_data_provider(para_dict_use_train, 'train', DEBUG_MODE=False)
 
 # -----------------------------------Loss------------------------------------------------------- #
 from scadec_Kraken.unet_bn_Kraken import Unet_bn

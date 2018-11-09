@@ -46,7 +46,7 @@ prediction_path = '../result/gpu' + gpu_ind + '/' + para_str_use_train + '/valid
 
 # # optional args
 opt_kwargs = {
-		'learning_rate': 0.0001#EDIT
+		'learning_rate': para_dict_use_train.get('learning_rate', 0.0001)#EDIT
 }
 
 # # make a trainer for scadec
