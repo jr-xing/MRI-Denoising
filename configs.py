@@ -2350,12 +2350,19 @@ para_dict_66 = {
     'GPU_IND':'0'
 }
 
+# re-run 64 with different mask
+para_str_67 = 'Idx_67-Loss_l2-Loss_preMask-Reg_no-Drop_0.8-Ob_FULL_SEG_3C_motion-Gt_FULL_SEG-LessClass-Nagini_4_Ouroboros'
+para_dict_67 = para_dict_64
+para_dict_67['idx'] = 67
+para_dict_67['server'] = '1'
+para_dict_67['GPU_IND'] = '3'
+
 #para_dict_use = para_dict_42
 #para_str_use = para_str_42
-para_dict_use_train = para_dict_58
-para_str_use_train = para_str_58
-# para_dict_use_train = para_dict_66
-# para_str_use_train = para_str_66
+# para_dict_use_train = para_dict_58
+# para_str_use_train = para_str_58
+para_dict_use_train = para_dict_67
+para_str_use_train = para_str_67
 
 para_dict_use_test = para_dict_46
 para_str_use_test = para_str_46

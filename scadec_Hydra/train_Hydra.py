@@ -429,7 +429,8 @@ class Trainer_bn(object):
         util.save_img(train_inputs, "%s/%s_img.png"%(self.prediction_path, "epoch_%s_train_inputs"%epoch))
         util.save_img(train_outputs, "%s/%s_img.png"%(self.prediction_path, "epoch_%s_train_outputs"%epoch))
         util.save_img(train_targets, "%s/%s_img.png"%(self.prediction_path, "epoch_%s_train_targets"%epoch))
-        util.save_img(train_masks, "%s/%s_img.png"%(self.prediction_path, "epoch_%s_train_masks"%epoch))
+        # util.save_img(train_masks, "%s/%s_img.png"%(self.prediction_path, "epoch_%s_train_masks"%epoch))
+        util.save_img(train_targets*train_masks, "%s/%s_img.png"%(self.prediction_path, "epoch_%s_train_targets_masked"%epoch))
 
     def output_valstats(self, sess, summary_writer, step, batch_x, batch_y, batch_cls, batch_masks, name, current_epoch, store_img=True):
         

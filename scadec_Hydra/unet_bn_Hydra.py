@@ -369,7 +369,7 @@ class Unet_bn(object):
             for img_idx in range(self.batch_size):
                 img_class_onehot = self.batch_cls[img_idx, :]
                 recon = tf.reshape(tf.dynamic_partition(self.necks, img_class_onehot, 2, name = 'part_necks')[0][0][img_idx,:,:,:],[1,320,320,self.truth_channels], name = 'reshape_recon')                
-                mask = tf.reshape(self.batch_masks[img_idx,:,:,:],[1,320,320,self.truth_channels], name='mask') + 0.1
+                mask = tf.reshape(self.batch_masks[img_idx,:,:,:],[1,320,320,self.truth_channels], name='mask')
                 # mask
                 # tf.math.reduce_max
                 recon_masked = tf.multiply(recon, mask, name = 'masked_recon')
