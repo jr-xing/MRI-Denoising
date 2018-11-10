@@ -31,6 +31,9 @@ elif type(para_dict_use_train['kwargs']) == list:
 	kwargs_list = para_dict_use_train['kwargs']
 	kwargs = kwargs_list[0]
 
+# kwargs['structure']['n_classes'] -= len(para_dict_use_train.get('ignore_classes', []))
+# kwargs['structure']['n_classes'] =  16 - len(para_dict_use_train.get('ignore_classes', []))
+kwargs_list[0]['structure']['n_classes'] -= len(para_dict_use_train.get('ignore_classes', []))
 net = Unet_bn(img_channels=data_channels, truth_channels=truth_channels, cost_dict_lists=losses_dict, kwargs_list=kwargs_list)
 
 ####################################################

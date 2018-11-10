@@ -41,6 +41,11 @@ Y_RAND = False
 SAVE_MODE = 'Xiaojian'# could be 'Xiaojian', 'Xing' or 'Original'
 SAVE_TRAIN_PRED = True
 
+def xNormImgs(img, target = 1):
+    img = (img - np.min(img)) / (np.max(img) - np.min(img))
+    if target == 255:
+        img = np.uint8(img*255)
+    return img
 
 class Trainer_bn(object):
     """
@@ -185,6 +190,14 @@ class Trainer_bn(object):
         if not os.path.exists(output_path):
             logging.info("Allocating '{:}'".format(output_path))
             os.makedirs(output_path)
+
+        if not os.path.exists(abs_prediction_path + '/mat'):
+            logging.info("Allocating '{:}'".format(abs_prediction_path + '/mat'))
+            os.makedirs(abs_prediction_path + '/mat')
+        
+        if not os.path.exists(abs_prediction_path + '/masked'):
+            logging.info("Allocating '{:}'".format(abs_prediction_path + '/masked'))
+            os.makedirs(abs_prediction_path + '/masked')
         
         return init
 
@@ -234,24 +247,43 @@ class Trainer_bn(object):
             logging.info("Start optimization")
 
             # select validation dataset
-            valid_x, valid_y, vbatch_cls = valid_provider(valid_size, fix=True)
+            valid_x, valid_y, vbatch_cls, vbatch_masks = valid_provider(valid_size, fix=True)
             if SAVE_MODE == 'Original':
                 util.save_mat(valid_y, "%s/%s.mat"%(self.prediction_path, 'origin_y'))
                 util.save_mat(valid_x, "%s/%s.mat"%(self.prediction_path, 'origin_x'))
             # Xiaojian's code
             elif SAVE_MODE == 'Xiaojian':
-                imgx = util.concat_n_images(valid_x)
-                imgy = util.concat_n_images(valid_y)
+                valid_inputs = util.concat_n_images(valid_x)
+                valid_targets = util.concat_n_images(valid_y)
+                valid_masks = util.concat_n_images(vbatch_masks)
+
+                imgx_LP, imgx_HP, imgy_LP, imgy_HP = sess.run([self.net.xLowPass, self.net.xHighPass, self.net.yLowPass, self.net.yHighPass], 
+                                                                        feed_dict={self.net.x: valid_x, 
+                                                                                    self.net.y: valid_y,
+                                                                                    self.net.batch_cls: vbatch_cls,
+                                                                                    self.net.batch_masks: vbatch_masks,
+                                                                                    self.net.total_epochs: self.total_epochs,
+                                                                                    self.net.keep_prob: 1.,
+                                                                                    self.net.phase: False})
+                valid_inputs_LP = xNormImgs(util.concat_n_images(imgx_LP), 255)
+                valid_inputs_HP = xNormImgs(util.concat_n_images(imgx_HP), 255)
+                valid_targets_LP = xNormImgs(util.concat_n_images(imgy_LP), 255)
+                valid_targets_HP = xNormImgs(util.concat_n_images(imgy_HP), 255)
 
                 batch_cls_str = ['cls: '+ str(clas) for clas in list(vbatch_cls.argmax(1))]
-                batch_outputs_psnr_str = ['PSNR: '+str(psnr) for psnr in list(util.computePSNRs(imgy, imgx))]
+                batch_outputs_psnr_str = ['PSNR: '+str(psnr) for psnr in list(util.computePSNRs(valid_targets, valid_inputs))]
                 batch_outputs_str = list(zip(batch_outputs_psnr_str, batch_cls_str))
                 batch_targets_str = list(zip(['PSNR: Inf']*len(batch_cls_str),batch_cls_str))
-                imgx = util.noteTexts2Imgs(imgx, batch_outputs_str)
-                imgy = util.noteTexts2Imgs(imgy, batch_targets_str)
+                
+                valid_inputs = util.noteTexts2Imgs(valid_inputs, batch_outputs_str)
+                valid_targets = util.noteTexts2Imgs(valid_targets, batch_targets_str)
 
-                util.save_img(imgx, "%s/%s_img.png"%(self.prediction_path, 'trainOb'))
-                util.save_img(imgy, "%s/%s_img.png"%(self.prediction_path, 'trainGt'))
+                valid_inputs_all = np.concatenate([valid_inputs, valid_inputs_LP, valid_inputs_HP], axis = 0)
+                valid_targets_all = np.concatenate([valid_targets, valid_targets_LP, valid_targets_HP], axis = 0)
+
+                util.save_img(valid_inputs_all, "%s/%s_img.png"%(self.prediction_path, 'validOb'))
+                util.save_img(valid_targets_all, "%s/%s_img.png"%(self.prediction_path, 'validGt'))
+                util.save_img(valid_targets*valid_masks, "%s/masked/%s_img.png"%(self.prediction_path, 'validMasked'))
 
             # pprint.pprint([var.name for var in tf.trainable_variables()])
             # Pre-training discrminnator
@@ -282,7 +314,7 @@ class Trainer_bn(object):
                 for step in range((epoch*training_iters), ((epoch+1)*training_iters)):
                     # print('data_provider.onehot_cls')
                     # print(data_provider.onehot_cls)
-                    batch_x, batch_y, batch_cls = data_provider(self.batch_size)
+                    batch_x, batch_y, batch_cls, batch_masks = data_provider(self.batch_size)
                     util.verbose_print('batch_cls in train', self.verbose)
                     util.verbose_print(batch_cls, self.verbose)
 
@@ -299,6 +331,7 @@ class Trainer_bn(object):
                                                             feed_dict={self.net.x: batch_x,
                                                                         self.net.y: batch_y,
                                                                         self.net.batch_cls: batch_cls,
+                                                                        self.net.batch_masks: batch_masks,
                                                                         self.net.current_epoch: epoch,
                                                                         self.net.total_epochs: epochs,
                                                                         self.net.keep_prob: dropout,
@@ -312,6 +345,7 @@ class Trainer_bn(object):
                                                             feed_dict={self.net.x: batch_x,
                                                                         self.net.y: batch_y,
                                                                         self.net.batch_cls: batch_cls,
+                                                                        self.net.batch_masks: batch_masks,
                                                                         self.net.current_epoch: epoch,
                                                                         self.net.total_epochs: epochs,
                                                                         self.net.keep_prob: dropout,
@@ -322,7 +356,7 @@ class Trainer_bn(object):
                         # Changed here - Xing
                         # logging.info("Iter {:}".format(step))
                         logging.info("Iter {:} (before training on the batch)\tMinibatch MSE= {:.4f},\tMinibatch Avg PSNR= {:.4f}".format(step, loss, avg_psnr))
-                        self.output_minibatch_stats(sess, summary_writer, step, batch_x, batch_y, batch_cls, epoch)
+                        self.output_minibatch_stats(sess, summary_writer, step, batch_x, batch_y, batch_cls, batch_masks, epoch)
                         
                     total_loss += loss
 
@@ -334,14 +368,14 @@ class Trainer_bn(object):
 
                 # output statistics for epoch
                 self.output_epoch_stats(epoch, total_loss/training_iters, training_iters, lr)
-                self.output_valstats(sess, summary_writer, step, valid_x, valid_y, vbatch_cls, "epoch_%s_valid"%epoch, epoch, store_img=True)
+                self.output_valstats(sess, summary_writer, step, valid_x, valid_y, vbatch_cls, vbatch_masks, "epoch_%s_valid"%epoch, epoch, store_img=True)
                 # Xing
                 if SAVE_TRAIN_PRED:
                     if SAVE_MODE == 'Original':
                         util.save_img(train_output[0,...], "%s/%s_img.tif"%(self.prediction_path, "epoch_%s_train"%epoch))
                     elif SAVE_MODE == 'Xiaojian':
                         # Xiaojian's code
-                        self.output_train_batch_stats(sess, epoch, batch_x, batch_y, batch_cls, epoch)
+                        self.output_train_batch_stats(sess, epoch, batch_x, batch_y, batch_cls, batch_masks, epoch)
 
                 if epoch % save_epoch == 0:
                     directory = os.path.join(output_path, "{}_cpkt/".format(step))
@@ -364,7 +398,7 @@ class Trainer_bn(object):
             logging.info("Epoch {:}, Average MSE: {:.4f}, learning rate: {:.4f}".format(epoch, (total_loss / training_iters), lr))
         
     
-    def output_minibatch_stats(self, sess, summary_writer, step, batch_x, batch_y, batch_cls, current_epoch):
+    def output_minibatch_stats(self, sess, summary_writer, step, batch_x, batch_y, batch_cls,batch_masks, current_epoch):
         # Calculate batch loss and accuracy
         loss, predictions, avg_psnr = sess.run([self.net.loss,  
                                                 self.net.recons,
@@ -372,6 +406,7 @@ class Trainer_bn(object):
                                                 feed_dict={self.net.x: batch_x,
                                                             self.net.y: batch_y,
                                                             self.net.batch_cls: batch_cls,
+                                                            self.net.batch_masks: batch_masks,
                                                             self.net.current_epoch: current_epoch,
                                                             self.net.total_epochs: self.total_epochs,
                                                             self.net.keep_prob: 1.,
@@ -386,7 +421,7 @@ class Trainer_bn(object):
         else:
             logging.info("Iter {:} (After training on the batch)\tMinibatch MSE= {:.4f},\tMinibatch Avg PSNR= {:.4f}".format(step,loss,avg_psnr))
 
-    def output_train_batch_stats(self, sess, epoch, batch_x, batch_y, batch_cls, current_epoch):
+    def output_train_batch_stats(self, sess, epoch, batch_x, batch_y, batch_cls, batch_masks, current_epoch):
         # Xing
         # Calculate batch loss and accuracy
         loss, \
@@ -405,19 +440,21 @@ class Trainer_bn(object):
                                                 feed_dict={self.net.x: batch_x,
                                                             self.net.y: batch_y,
                                                             self.net.batch_cls: batch_cls,
+                                                            self.net.batch_masks: batch_masks,
                                                             self.net.current_epoch: current_epoch,
                                                             self.net.total_epochs: self.total_epochs,
                                                             self.net.keep_prob: 1.,
                                                             self.net.phase: False})        
         train_inputs = util.concat_n_images(batch_x)
-        train_inputs_LP = util.concat_n_images(batch_xLP)
-        train_inputs_HP = util.concat_n_images(batch_xHP)
+        train_inputs_LP = xNormImgs(util.concat_n_images(batch_xLP), 255)
+        train_inputs_HP = xNormImgs(util.concat_n_images(batch_xHP), 255)
         train_outputs = util.concat_n_images(predictions)
-        train_outputs_LP = util.concat_n_images(predictions_LP)
-        train_outputs_HP = util.concat_n_images(predictions_HP)
+        train_outputs_LP = xNormImgs(util.concat_n_images(predictions_LP), 255)
+        train_outputs_HP = xNormImgs(util.concat_n_images(predictions_HP), 255)
         train_targets = util.concat_n_images(batch_y)
-        train_targets_LP = util.concat_n_images(batch_yLP)
-        train_targets_HP = util.concat_n_images(batch_yHP)
+        train_targets_LP = xNormImgs(util.concat_n_images(batch_yLP), 255)
+        train_targets_HP = xNormImgs(util.concat_n_images(batch_yHP), 255)
+        train_masks = util.concat_n_images(batch_masks)
         
         batch_cls_str = ['cls: '+ str(clas) for clas in list(batch_cls.argmax(1))]
         batch_inputs_psnr_str = ['PSNR: '+str(psnr)  for psnr in list(util.computePSNRs(train_targets, train_inputs))]
@@ -427,25 +464,31 @@ class Trainer_bn(object):
         batch_targets_str = list(zip(['PSNR: Inf']*len(batch_cls_str),batch_cls_str))
 
         # img = util.noteTexts2Imgs(img, x_cls_str)
-        train_inputs = util.noteTexts2Imgs(train_inputs, batch_inputs_str)
-        train_outputs = util.noteTexts2Imgs(train_outputs, batch_outputs_str)
-        train_targets = util.noteTexts2Imgs(train_targets, batch_targets_str)
-        
-        util.save_img(train_inputs, "%s/%s_img.png"%(self.prediction_path, "epoch_%s_train_inputs"%epoch))
-        util.save_img(train_inputs_LP, "%s/%s_img_LP.png"%(self.prediction_path, "epoch_%s_train_inputs"%epoch))
-        util.save_img(train_inputs_HP, "%s/%s_img_HP.png"%(self.prediction_path, "epoch_%s_train_inputs"%epoch))
-        
-        util.save_mat(batch_xHP, "%s/%s_img_HP.mat"%(self.prediction_path, "epoch_%s_train_inputs"%epoch))
-        util.save_mat(batch_xLP, "%s/%s_img_LP.mat"%(self.prediction_path, "epoch_%s_train_inputs"%epoch))
+        train_inputs_noted = util.noteTexts2Imgs(train_inputs, batch_inputs_str)
+        train_outputs_noted = util.noteTexts2Imgs(train_outputs, batch_outputs_str)
+        train_targets_noted = util.noteTexts2Imgs(train_targets, batch_targets_str)
 
-        util.save_img(train_outputs, "%s/%s_img.png"%(self.prediction_path, "epoch_%s_train_outputs"%epoch))
-        util.save_img(train_outputs_LP, "%s/%s_img_LP.png"%(self.prediction_path, "epoch_%s_train_outputs"%epoch))
-        util.save_img(train_outputs_HP, "%s/%s_img_HP.png"%(self.prediction_path, "epoch_%s_train_outputs"%epoch))
-        util.save_img(train_targets, "%s/%s_img.png"%(self.prediction_path, "epoch_%s_train_targets"%epoch))
-        util.save_img(train_targets_LP, "%s/%s_img_LP.png"%(self.prediction_path, "epoch_%s_train_targets"%epoch))
-        util.save_img(train_targets_HP, "%s/%s_img_HP.png"%(self.prediction_path, "epoch_%s_train_targets"%epoch))
+        train_inputs_all = np.concatenate([train_inputs_noted, train_inputs_LP, train_inputs_HP], axis = 0)
+        train_outputs_all = np.concatenate([train_outputs_noted, train_outputs_LP, train_outputs_HP], axis = 0)
+        train_targets_all = np.concatenate([train_targets_noted, train_targets_LP, train_targets_HP], axis = 0)
+        
+        util.save_img(train_inputs_all, "%s/%s_img.png"%(self.prediction_path, "epoch_%s_train_inputs"%epoch))
+        # util.save_img(train_inputs_LP, "%s/%s_img_LP.png"%(self.prediction_path, "epoch_%s_train_inputs"%epoch))
+        # util.save_img(train_inputs_HP, "%s/%s_img_HP.png"%(self.prediction_path, "epoch_%s_train_inputs"%epoch))
+        
+        # util.save_mat(batch_xHP, "%s/mat/%s_img_HP.mat"%(self.prediction_path, "epoch_%s_train_inputs"%epoch))
+        # util.save_mat(batch_xLP, "%s/mat/%s_img_LP.mat"%(self.prediction_path, "epoch_%s_train_inputs"%epoch))
+        # util.save_mat(batch_xLP, "%s/mat/%s_img_LP.mat"%(self.prediction_path, "epoch_%s_train_inputs"%epoch))
 
-    def output_valstats(self, sess, summary_writer, step, batch_x, batch_y, batch_cls, name, current_epoch, store_img=True):        
+        util.save_img(train_outputs_all, "%s/%s_img.png"%(self.prediction_path, "epoch_%s_train_outputs"%epoch))
+        # util.save_img(train_outputs_LP, "%s/%s_img_LP.png"%(self.prediction_path, "epoch_%s_train_outputs"%epoch))
+        # util.save_img(train_outputs_HP, "%s/%s_img_HP.png"%(self.prediction_path, "epoch_%s_train_outputs"%epoch))
+        util.save_img(train_targets_all, "%s/%s_img.png"%(self.prediction_path, "epoch_%s_train_targets"%epoch))        
+        # util.save_img(train_targets_LP, "%s/%s_img_LP.png"%(self.prediction_path, "epoch_%s_train_targets"%epoch))
+        # util.save_img(train_targets_HP, "%s/%s_img_HP.png"%(self.prediction_path, "epoch_%s_train_targets"%epoch))
+        util.save_img(train_targets*train_masks, "%s/masked/%s_img.png"%(self.prediction_path, "epoch_%s_train_targets_masked"%epoch))
+
+    def output_valstats(self, sess, summary_writer, step, batch_x, batch_y, batch_cls, batch_masks, name, current_epoch, store_img=True):        
         batch_xLP, batch_xHP, \
         batch_yLP, batch_yHP, \
         prediction, prediction_LP, prediction_HP, \
@@ -462,6 +505,7 @@ class Trainer_bn(object):
                                                 feed_dict={self.net.x: batch_x, 
                                                             self.net.y: batch_y,
                                                             self.net.batch_cls: batch_cls,
+                                                            self.net.batch_masks:batch_masks,
                                                             self.net.current_epoch: current_epoch,
                                                             self.net.total_epochs: self.total_epochs,
                                                             self.net.keep_prob: 1.,
@@ -480,7 +524,7 @@ class Trainer_bn(object):
             logging.info("Validation Statistics, validation loss= {:.4f}".format(loss))
             logging.info('\n'+text2art("Avg   PSNR:   {:.4f}".format(avg_psnr)))
 
-        util.save_mat(prediction, "%s/%s.mat"%(self.prediction_path, name))
+        util.save_mat(prediction, "%s/mat/%s.mat"%(self.prediction_path, name))
 
         if store_img:
             if SAVE_MODE == 'Original':
@@ -488,14 +532,17 @@ class Trainer_bn(object):
             elif SAVE_MODE == 'Xiaojian':
                 # Xiaojian's code
                 # img = util.concat_n_images(prediction)
-                valid_inputs_LP = util.concat_n_images(batch_xLP)
-                valid_inputs_HP = util.concat_n_images(batch_xHP)
+                # valid_inputs_LP = util.concat_n_images(batch_xLP)
+                # valid_inputs_HP = util.concat_n_images(batch_xHP)
                 valid_outputs = util.concat_n_images(prediction)
-                valid_outputs_LP = util.concat_n_images(prediction_LP)
-                valid_outputs_HP = util.concat_n_images(prediction_HP)
+                valid_outputs_LP = xNormImgs(util.concat_n_images(prediction_LP), 255)
+                valid_outputs_HP = xNormImgs(util.concat_n_images(prediction_HP), 255)
                 valid_targets = util.concat_n_images(batch_y)
-                valid_targets_LP = util.concat_n_images(batch_yLP)
-                valid_targets_HP = util.concat_n_images(batch_yHP)
+                # valid_targets_LP = util.concat_n_images(batch_yLP)
+                # valid_targets_HP = util.concat_n_images(batch_yHP)
+
+                # util.save_mat(batch_xHP, "%s/mat/%s_img_HP.mat"%(self.prediction_path, "epoch_%s_train_inputs"%epoch))
+                # util.save_mat(prediction, "%s/mat/%s_img_LP.mat"%(self.prediction_path, "epoch_%s_valid"%current_epoch))
 
                 batch_cls_str = ['cls: '+ str(clas) for clas in list(batch_cls.argmax(1))]
                 batch_outputs_psnr_str = ['PSNR: '+str(psnr) for psnr in list(util.computePSNRs(valid_targets, valid_outputs))]
@@ -503,14 +550,18 @@ class Trainer_bn(object):
 
                 valid_outputs = util.noteTexts2Imgs(valid_outputs, batch_outputs_str)
 
+                # valid_inputs_all = np.concatenate([valid_inputs, valid_inputs_LP, valid_inputs_HP], axis = 1)
+                valid_outputs_all = np.concatenate([valid_outputs, valid_outputs_LP, valid_outputs_HP], axis = 0)
+                # valid_targets_all = np.concatenate([valid_targets, valid_targets_LP, valid_targets_HP], axis = 1)
+
                 # util.save_img(img, "%s/%s_img.tif"%(self.prediction_path, name))
-                util.save_img(valid_inputs_LP, "%s/%s_img_inputs_LP.png"%(self.prediction_path, name))
-                util.save_img(valid_inputs_HP, "%s/%s_img_inputs_HP.png"%(self.prediction_path, name))
-                util.save_img(valid_outputs, "%s/%s_img.png"%(self.prediction_path, name))
-                util.save_img(valid_outputs_LP, "%s/%s_img_LP.png"%(self.prediction_path, name))
-                util.save_img(valid_outputs_HP, "%s/%s_img_HP.png"%(self.prediction_path, name))
-                util.save_img(valid_targets_LP, "%s/%s_img_targets_LP.png"%(self.prediction_path, name))
-                util.save_img(valid_targets_HP, "%s/%s_img_targets_HP.png"%(self.prediction_path, name))
+                # util.save_img(valid_inputs_LP, "%s/%s_img_inputs_LP.png"%(self.prediction_path, name))
+                # util.save_img(valid_inputs_HP, "%s/%s_img_inputs_HP.png"%(self.prediction_path, name))
+                util.save_img(valid_outputs_all, "%s/%s_img.png"%(self.prediction_path, name))
+                # util.save_img(valid_outputs_LP, "%s/%s_img_LP.png"%(self.prediction_path, name))
+                # util.save_img(valid_outputs_HP, "%s/%s_img_HP.png"%(self.prediction_path, name))
+                # util.save_img(valid_targets_LP, "%s/%s_img_targets_LP.png"%(self.prediction_path, name))
+                # util.save_img(valid_targets_HP, "%s/%s_img_targets_HP.png"%(self.prediction_path, name))
 
         time_this_epoch_end = time.time()
         time_this_epoch = time_this_epoch_end - self.time_last_epoch_end
@@ -533,4 +584,6 @@ class Trainer_bn(object):
             summary.value.add(tag=name, simple_value = value)
         writer.add_summary(summary, step)
         writer.flush()
+    
 
+        

@@ -179,10 +179,11 @@ class Unet_bn(object):
         #     self.structure_type = self.structure
         #     self.batch_cls = tf.placeholder(tf.int32,[None, kwargs.get('n_classes',1)], name='batch_cls')
         # self.structure_type = 'Hydra'
-        self.structure_type = kwargs.get('structure_type','highLowPass')
-        self.batch_cls = tf.placeholder(tf.int32,[None, kwargs.get('n_classes',1)], name='batch_cls')
+        self.structure_type = kwargs['structure'].get('type','highLowPass')
+        self.batch_cls = tf.placeholder(tf.int32,[None, kwargs['structure'].get('n_classes',1)], name='batch_cls')
         # self.batch_cls = 1
         
+        self.batch_masks = tf.placeholder("float", shape=[None, None, None, truth_channels], name = 'masks')
         self._get_net(kwargs_list)        
 
         # Xing
@@ -203,7 +204,7 @@ class Unet_bn(object):
         
         kwargs = kwargs_list[0]
         if len(kwargs_list) > 1:
-            structure_type = kwargs.pop('structure_type','highLowPass')
+            structure_type = kwargs['structure'].pop('type','highLowPass')
             if structure_type == 'highLowPass':
                 lowPass_kwargs  = [kwargs for kwargs in kwargs_list[1:] if kwargs['name']=='lowPass'][0]
                 highPass_kwargs = [kwargs for kwargs in kwargs_list[1:] if kwargs['name']=='highPass'][0]
@@ -299,7 +300,7 @@ class Unet_bn(object):
         dprint('Computing Cost...')
         # total_pixels = self.nx * self.ny * self.truth_channels
 
-        def get_mask(mode = 'default', h = 320, w = 320, paras = {}):
+        def get_mask(mode = 'default', h = 320, w = 320, paras = {}, pre_mask = None):
             # Generate mask
             if mode == None:
                 return np.float32(np.ones([w, h, 1]))                
@@ -326,6 +327,8 @@ class Unet_bn(object):
             elif mode == 'GaussianHighPass':
                 normMask = get_mask('norm', h, w)
                 return 1 - normMask
+            elif mode == 'precomputed':
+                return self.batch_masks
 
         def get_edge(img, operator, get_XY = False, NMS = False, NMS_window_size = 3):
             # https://blog.csdn.net/huanghuangjin/article/details/81130171
@@ -370,6 +373,12 @@ class Unet_bn(object):
                     loss_l2 = tf.losses.mean_squared_error(tf.multiply(x,mask), tf.multiply(y,mask))
                     current_loss = loss_l2
                     current_loss_name = cost_dict['name']
+                
+                elif cost_dict['name'] == 'l1':
+                    mask = get_mask(mode=cost_dict.get('mask',None),h=320,w=320)
+                    loss_l1 = tf.losses.absolute_difference(tf.multiply(x,mask), tf.multiply(y,mask))
+                    current_loss = loss_l1
+                    current_loss_name = cost_dict['name']    
 
                 elif cost_dict['name'] == 'edge':
                     mask = get_mask(mode=cost_dict.get('mask',None),h=320,w=320)
@@ -399,7 +408,8 @@ class Unet_bn(object):
                         current_loss = loss_masked_edge
                         current_loss_name = cost_dict['edge_type']
 
-                    else:                    
+                    else:
+                        raise ValueError('Unsupported: mask_before_operate')
                         if cost_dict.get('get_XY',False):
                             edge_x_X,edge_x_Y = get_edge(x, operator=cost_dict['edge_type'], get_XY=True)
                             edge_y_X,edge_y_Y = get_edge(y, operator=cost_dict['edge_type'], get_XY=True)
@@ -458,31 +468,15 @@ class Unet_bn(object):
         #         total_loss_dict[cost_dict['name']] = 0
         
         # Get loss
-        if self.structure_type == 'highLowPass':  
-            # self.lowPassFilter = tf.constant(1/9, shape=[1, 3, 3, 1], name='lowPass_filter')
-            # xLowPass = tf.nn.conv2d(self.x, self.lowPassFilter, strides = [1,1,1,1], padding='SAME', name = 'lowPass')
-
-            # def get_gradient(img):            
-            #     imgY, imgX = tf.image.image_gradients(img)
-            #     return tf.sqrt(tf.square(imgX)+tf.square(imgY), name='yHighPass')
-            
-            # def get_blured(img, size = 3):
-            #     self.lowPassFilter_C1 = tf.constant(1/size**2, shape=[size, size, 1, 1], name='lowPass_filter_C1')
-            #     return tf.nn.conv2d(img, self.lowPassFilter_C1, strides = [1,1,1,1], padding='SAME', name = 'ylowPass')
-
-            # self.lowPassFilter_C1 = tf.constant(1/9, shape=[3, 3, 1, 1], name='lowPass_filter_C3')
-            # yLowPass = tf.nn.conv2d(self.y, self.lowPassFilter_C1, strides = [1,1,1,1], padding='SAME', name = 'ylowPass')
+        if self.structure_type == 'highLowPass':              
             self.yLowPass = get_lowPass(self.y, mode='fft_Gaussian')
             lowPass_loss_list = [cost_dict_list for cost_dict_list in cost_dict_lists if cost_dict_list[0]=='forLowPass'][0][1:]
             lowPass_loss_dict = get_losses(self.recons_lowPass, self.yLowPass, lowPass_loss_list, prefix='lowPass')
             
-            # yHighPass = tf.subtract(self.y, yLowPass, name = 'yHighPass')
-            # print('YYYYYYYYYYYYYYYYYYYYYYY')
-            # print(self.y)
+    
             self.yHighPass = get_highPass(self.y, mode='fft_Gaussian')
             highPass_loss_list = [cost_dict_list for cost_dict_list in cost_dict_lists if cost_dict_list[0]=='forHighPass'][0][1:]
             highPass_loss_dict = get_losses(self.recons_highPass, self.yHighPass, highPass_loss_list, prefix='highPass')
-            # print(highPass_loss_dict.keys())
             
             recons_loss_list = [cost_dict_list for cost_dict_list in cost_dict_lists if cost_dict_list[0]=='forRecon'][0][1:]
             recons_loss_dict = get_losses(self.recons, self.y, recons_loss_list, prefix='recon')
@@ -493,21 +487,7 @@ class Unet_bn(object):
                         total_loss_dict[key] += value
                     else:
                         total_loss_dict[key]  = value
-            
-            # for key, value in highPass_loss_dict.items():
-            #     if key in total_loss_dict:
-            #         total_loss_dict[key] += value
-            #     else:
-            #         total_loss_dict[key]  = value
-            
-            # for key, value in highPass_loss_dict.items():
-            #     if key in total_loss_dict:
-            #         total_loss_dict[key] += value
-            #     else:
-            #         total_loss_dict[key]  = value
-                # total_loss_dict[key] += value
-                
-                # total_loss_dict['total_loss'] += 
+                        
         
         return total_loss_dict
 

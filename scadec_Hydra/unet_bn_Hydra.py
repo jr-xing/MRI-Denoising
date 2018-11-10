@@ -177,7 +177,7 @@ class Unet_bn(object):
         dprint('Computing Cost...')
         # total_pixels = self.nx * self.ny * self.truth_channels
 
-        def get_mask(mode = 'default', h = 320, w = 320, paras = {}):
+        def get_mask(mode = 'default', h = 320, w = 320, paras = {}, pre_mask = None):
             # Generate mask
             if mode == None:
                 return np.float32(np.ones([w, h, 1]))                
@@ -210,6 +210,8 @@ class Unet_bn(object):
             elif mode == 'GaussianHighPass':
                 normMask = get_mask('norm', h, w)
                 return 1 - normMask
+            elif mode == 'precomputed':
+                return pre_mask
 
 
         def non_max_suppression(input, window_size = 3):
@@ -257,19 +259,25 @@ class Unet_bn(object):
                 raise ValueError("Unknown edge type: "+operator)
 
         
-        def get_losses(x, y, cost_dict_list):
+        def get_losses(x, y, cost_dict_list, others = {}):
             loss = 0
             loss_dict = {}
             for cost_dict in cost_dict_list:
-
+                mask = get_mask(mode=cost_dict.get('mask',None),h=320,w=320, pre_mask=others.get('pre_mask', None))
                 if cost_dict['name'] == 'l2' or cost_dict['name'] == 'mean_square_error':                
-                    mask = get_mask(mode=cost_dict.get('mask',None),h=320,w=320)
+                    # mask = get_mask(mode=cost_dict.get('mask',None),h=320,w=320)
                     loss_l2 = tf.losses.mean_squared_error(tf.multiply(x,mask), tf.multiply(y,mask))
                     current_loss = loss_l2
                     current_loss_name = cost_dict['name']
+                
+                elif cost_dict['name'] == 'l1':
+                    # mask = get_mask(mode=cost_dict.get('mask',None),h=320,w=320)
+                    loss_l1 = tf.losses.absolute_difference(tf.multiply(x,mask), tf.multiply(y,mask))
+                    current_loss = loss_l1
+                    current_loss_name = cost_dict['name']    
 
                 elif cost_dict['name'] == 'edge':
-                    mask = get_mask(mode=cost_dict.get('mask',None),h=320,w=320)
+                    # mask = get_mask(mode=cost_dict.get('mask',None),h=320,w=320)
                     if cost_dict.get('mask_before_operate',False):
                         # Get masked images
                         x_masked = tf.multiply(x, mask)
@@ -312,7 +320,7 @@ class Unet_bn(object):
                     current_loss = tf.cond(tf.less_equal(self.current_epoch, self.total_epochs-cost_dict.get('invalid_last', 0)), lambda:current_loss, lambda:0.0)
                 
                 elif cost_dict['name'] == 'kl2':
-                    mask = get_mask(mode=cost_dict.get('mask',None),h=320,w=320)
+                    # mask = get_mask(mode=cost_dict.get('mask',None),h=320,w=320)
                     x_fft = tf.multiply(tf.fft2d(tf.cast(x,tf.complex64)), mask)
                     y_fft = tf.multiply(tf.fft2d(tf.cast(y,tf.complex64)), mask)
                     # loss_kl2 = tf.losses.mean_squared_error(x_fft.real, y_fft.real) + tf.losses.mean_squared_error(x_fft.imag, y_fft.imag)
@@ -321,7 +329,7 @@ class Unet_bn(object):
                     current_loss_name = cost_dict['name']
                 
                 elif cost_dict['name'] == 'kl1':
-                    mask = get_mask(mode=cost_dict.get('mask',None),h=320,w=320)
+                    # mask = get_mask(mode=cost_dict.get('mask',None),h=320,w=320)
                     x_fft = tf.multiply(tf.fft2d(tf.cast(x,tf.complex64)), mask)
                     y_fft = tf.multiply(tf.fft2d(tf.cast(y,tf.complex64)), mask)
                     # loss_kl2 = tf.losses.mean_squared_error(x_fft.real, y_fft.real) + tf.losses.mean_squared_error(x_fft.imag, y_fft.imag)
@@ -369,16 +377,17 @@ class Unet_bn(object):
             for img_idx in range(self.batch_size):
                 img_class_onehot = self.batch_cls[img_idx, :]
                 recon = tf.reshape(tf.dynamic_partition(self.necks, img_class_onehot, 2, name = 'part_necks')[0][0][img_idx,:,:,:],[1,320,320,self.truth_channels], name = 'reshape_recon')                
-                mask = tf.reshape(self.batch_masks[img_idx,:,:,:],[1,320,320,self.truth_channels], name='mask')
+                pre_mask = tf.reshape(self.batch_masks[img_idx,:,:,:],[1,320,320,self.truth_channels], name='mask')
+                # cost_dict_list['pre_mask'] = mask
                 # mask
                 # tf.math.reduce_max
-                recon_masked = tf.multiply(recon, mask, name = 'masked_recon')
+                # recon_masked = tf.multiply(recon, mask, name = 'masked_recon')
 
                 y = tf.reshape(self.y[img_idx,:,:,:],[1,320,320,self.truth_channels])
-                y_masked = tf.multiply(y, mask, name = 'masked_y')
+                # y_masked = tf.multiply(y, mask, name = 'masked_y')
                 
-                # loss_dict = get_losses(recon, y, cost_dict_list)                
-                loss_dict = get_losses(recon_masked, y_masked, cost_dict_list)
+                loss_dict = get_losses(recon, y, cost_dict_list, {'pre_mask':pre_mask})
+                # loss_dict = get_losses(recon_masked, y_masked, cost_dict_list)
                 
                 if self.recons == None:
                     dprint('Create self.recons')

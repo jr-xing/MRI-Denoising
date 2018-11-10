@@ -228,3 +228,4 @@ def concat_n_images(image_mat, batch_cls = None):
 def verbose_print(str, verbose):
     if verbose:
         print(str)
+

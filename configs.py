@@ -2350,6 +2350,8 @@ para_dict_66 = {
     'GPU_IND':'0'
 }
 
+
+
 # re-run 64 with different mask
 para_str_67 = 'Idx_67-Loss_l2-Loss_preMask-Reg_no-Drop_0.8-Ob_FULL_SEG_3C_motion-Gt_FULL_SEG-LessClass-Nagini_4_Ouroboros'
 para_dict_67 = para_dict_64
@@ -2357,12 +2359,102 @@ para_dict_67['idx'] = 67
 para_dict_67['server'] = '1'
 para_dict_67['GPU_IND'] = '3'
 
+# OctoNet #2
+para_str_68 = 'Idx_68-Nagini_Octo'
+para_dict_68 = {
+    'idx':68,
+    'losses':
+    [
+        [
+            'forHighPass',        
+            {
+                'name':'l1',                
+                'weight':1,
+                'mask':'precomputed',
+                'mask_before_operate':False,
+                'get_XY':True,
+                'type':'3',
+                'invalid_last':0
+            }
+        ],
+        [
+            'forLowPass',        
+            {
+                'name':'l2',
+                'weight':1,
+                'mask':None
+            }
+        ],[
+            'forRecon',        
+            {
+                'name':'l1',
+                'weight':1,
+                'mask':'precomputed'
+            }
+        ]
+
+    ],
+    'reg':None,
+    'Keep':0.8,
+    'Ob':'FULL_SEG_3C_motion',
+    'Gt':'FULL_SEG',
+    'preMask':True,
+    'preMaskAdd':0.1,
+    'ignore_classes':[0,1,13,14,15],
+    'kwargs' : [{             # Kwargs[0] must be common parameters
+        "summaries": True,
+        "get_loss_dict": True,
+        "batch_size": 5,
+        "valid_size": 5,
+        "structure":{
+            "type":"highLowPass",
+            "n_classes": 16
+        }        
+    },
+    {
+        "name":"lowPass",
+        "layers": 3,           # how many resolution levels we want to have
+        "conv_times": 2,       # how many times we want to convolve in each level
+        "features_root": 32,   # how many feature_maps we want to have as root (the following levels will calculate the feature_map by multiply by 2, exp, 64, 128, 256)
+        "filter_size": 5,      # filter size used in convolution
+        "pool_size": 2,        # pooling size used in max-pooling        
+        'structure':{
+            'type':'Nagini',
+            'GAN':False,
+            'Ouroboros':False,
+            # 'n_classes':16
+        },
+    },
+    {
+        "name":"highPass",
+        "layers": 4,           # how many resolution levels we want to have
+        "conv_times": 2,       # how many times we want to convolve in each level
+        "features_root": 32,   # how many feature_maps we want to have as root (the following levels will calculate the feature_map by multiply by 2, exp, 64, 128, 256)
+        "filter_size": 5,      # filter size used in convolution
+        "pool_size": 2,        # pooling size used in max-pooling
+        'structure':{
+            'type':'Nagini',
+            'GAN':False,
+            'Ouroboros':False,
+            # 'n_classes':16
+        },
+    }],
+    'proc_dict':{
+        'data':{},
+        'truth':{}        
+    },
+    'epochs':200,
+    'optimizer': 'adam',
+    'server': '2',
+    'GPU_IND':'3'
+}
+
 #para_dict_use = para_dict_42
 #para_str_use = para_str_42
 # para_dict_use_train = para_dict_58
 # para_str_use_train = para_str_58
-para_dict_use_train = para_dict_67
-para_str_use_train = para_str_67
+para_dict_use_train = para_dict_68
+para_str_use_train = para_str_68
 
 para_dict_use_test = para_dict_46
 para_str_use_test = para_str_46

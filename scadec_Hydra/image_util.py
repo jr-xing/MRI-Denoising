@@ -474,9 +474,9 @@ def get_data_provider(para_dict_use, mode = 'train', DEBUG_MODE = False):
                     # data_masks = predict_masks(truths, savePatches=False, loadYPre=True, saveMasks=True, save_path=save_path,saveName=saveName, model_path=model_path)
                 else:
                     save_path = '../data/masks/'                
-                    data_masks_1 = predict_masks(truths1, savePatches=False, saveYPre=True, saveMasks=True, save_path = save_path, saveName=saveName + '_1.npy', model_path=model_path)
-                    data_masks_2 = predict_masks(truths2, savePatches=False, saveYPre=True, saveMasks=True, save_path = save_path, saveName=saveName + '_2.npy', model_path=model_path)
-                    data_masks_3 = predict_masks(truths3, savePatches=False, saveYPre=True, saveMasks=True, save_path = save_path, saveName=saveName + '_3.npy', model_path=model_path)
+                    data_masks_1 = predict_masks(truths1, savePatches=False, saveYPre=True, saveMasks=True, save_path = save_path, saveName=saveName + '_1', model_path=model_path)
+                    data_masks_2 = predict_masks(truths2, savePatches=False, saveYPre=True, saveMasks=True, save_path = save_path, saveName=saveName + '_2', model_path=model_path)
+                    data_masks_3 = predict_masks(truths3, savePatches=False, saveYPre=True, saveMasks=True, save_path = save_path, saveName=saveName + '_3', model_path=model_path)
                     data_masks  = np.concatenate([data_masks_1, data_masks_2, data_masks_3], axis=0)
             
             else:
