@@ -41,6 +41,11 @@ Y_RAND = False
 SAVE_MODE = 'Xiaojian'# could be 'Xiaojian', 'Xing' or 'Original'
 SAVE_TRAIN_PRED = True
 
+def xNormImgs(img, target = 1):
+    img = (img - np.min(img)) / (np.max(img) - np.min(img))
+    if target == 255:
+        img = np.uint8(img*255)
+    return img
 
 class Trainer_bn(object):
     """
@@ -186,6 +191,13 @@ class Trainer_bn(object):
             logging.info("Allocating '{:}'".format(output_path))
             os.makedirs(output_path)
         
+        if not os.path.exists(abs_prediction_path + '/mat'):
+            logging.info("Allocating '{:}'".format(abs_prediction_path + '/mat'))
+            os.makedirs(abs_prediction_path + '/mat')
+        
+        if not os.path.exists(abs_prediction_path + '/masked'):
+            logging.info("Allocating '{:}'".format(abs_prediction_path + '/masked'))
+            os.makedirs(abs_prediction_path + '/masked')
         return init
 
     def train(self, data_provider, output_path, valid_provider, valid_size, training_iters=100, epochs=1000, dropout=0.75, display_step=1, save_epoch=50, restore=False, write_graph=False, prediction_path='validation'):
@@ -425,12 +437,14 @@ class Trainer_bn(object):
         train_inputs = util.noteTexts2Imgs(train_inputs, batch_inputs_str)
         train_outputs = util.noteTexts2Imgs(train_outputs, batch_outputs_str)
         train_targets = util.noteTexts2Imgs(train_targets, batch_targets_str)
+        train_all = np.concatenate([train_inputs, train_outputs, train_targets], axis = 0)
         
-        util.save_img(train_inputs, "%s/%s_img.png"%(self.prediction_path, "epoch_%s_train_inputs"%epoch))
-        util.save_img(train_outputs, "%s/%s_img.png"%(self.prediction_path, "epoch_%s_train_outputs"%epoch))
-        util.save_img(train_targets, "%s/%s_img.png"%(self.prediction_path, "epoch_%s_train_targets"%epoch))
+        # util.save_img(train_inputs, "%s/%s_img.png"%(self.prediction_path, "epoch_%s_train_inputs"%epoch))
+        # util.save_img(train_outputs, "%s/%s_img.png"%(self.prediction_path, "epoch_%s_train_outputs"%epoch))
+        # util.save_img(train_targets, "%s/%s_img.png"%(self.prediction_path, "epoch_%s_train_targets"%epoch))
+        util.save_img(train_all, "%s/%s_img.png"%(self.prediction_path, "epoch_%s_train"%epoch))
         # util.save_img(train_masks, "%s/%s_img.png"%(self.prediction_path, "epoch_%s_train_masks"%epoch))
-        util.save_img(train_targets*train_masks, "%s/%s_img.png"%(self.prediction_path, "epoch_%s_train_targets_masked"%epoch))
+        util.save_img(train_targets*train_masks, "%s/masked/%s_img.png"%(self.prediction_path, "epoch_%s_train_targets_masked"%epoch))
 
     def output_valstats(self, sess, summary_writer, step, batch_x, batch_y, batch_cls, batch_masks, name, current_epoch, store_img=True):
         
@@ -459,7 +473,7 @@ class Trainer_bn(object):
             logging.info("Validation Statistics, validation loss= {:.4f}".format(loss))
             logging.info('\n'+text2art("Avg   PSNR:   {:.4f}".format(avg_psnr)))
 
-        util.save_mat(prediction, "%s/%s.mat"%(self.prediction_path, name))
+        util.save_mat(prediction, "%s/mat/%s.mat"%(self.prediction_path, name))
 
         if store_img:
             if SAVE_MODE == 'Original':
