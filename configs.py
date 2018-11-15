@@ -2515,7 +2515,10 @@ para_dict_70['idx'] = 70
 para_dict_70['GPU_IND'] = '2'
 para_str_70 = 'Idx_70-Loss_l1-Loss_gradient_type_1_w_50-Loss_preMask_p02-Reg_no-Drop_1-Ob_FULL_SEG_3C_motion-Gt_FULL_SEG-LessClass-Nagini_4_Ouroboros'
 
-
+# re-run 68 with 1000_data
+para_dict_71 = para_dict_68.copy()
+para_dict_71['Ob'] = 'FULL_SEG__1000_3C_motion'
+para_str_71 = 'Idx_71-Nagini_Octo_1000'
 
 #para_dict_use = para_dict_42
 #para_str_use = para_str_42

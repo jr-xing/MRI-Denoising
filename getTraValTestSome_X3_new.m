@@ -19,10 +19,14 @@
 
 %% Set path and other parameters
 % workPath = '/media/remussn/Document/xdocument/development/mri/workSpace';
-dataPath = '/export/project/xiaojianxu/jiarui/MRI/workSpace/data_seg';
-savePath = '/export/project/xiaojianxu/jiarui/MRI/workSpace'
+% dataPath = '/export/project/xiaojianxu/jiarui/MRI/workSpace/data_seg';
+% savePath = '/export/project/xiaojianxu/jiarui/MRI/workSpace'
 %dataPath = '/export/project/jiarui.xing/Projects/MRI/workSpace/data_seg';
 %savePath = '/export/project/jiarui.xing/Projects/MRI/workSpace';
+
+dataPath = '/export/project/xiaojianxu/jiarui/MRI/workSpace/data/data_seg_1000';
+savePath = '/export/project/xiaojianxu/jiarui/MRI/workSpace/data';
+
 traGtFiles = {'csSubj01','csSubj02','csSubj03','csSubj04','csSubj05','csSubj06','csSubj07','csSubj09'};    
 traObFiles = {'mcSubj01','mcSubj02','mcSubj03','mcSubj04','mcSubj05','mcSubj06','mcSubj07','mcSubj09'};
 valGtFiles = {'csSubj08'};               valObFiles = {'mcSubj08'};
@@ -45,11 +49,16 @@ addChanMode = 'neigh_motion';
 %valGt = load_split_save('valGt', valGtFiles, workPath, addChan, addChanMode, 1:960);
 %valOb = load_split_save('valOb', valObFiles, workPath, addChan, addChanMode, 1:960);
 %load_split_save('traGt', traGtFiles, dataPath, savePath, addChan, addChanMode, indArr, 3, 'FULL_SEG');
-load_split_save('traGt', traGtFiles, dataPath, savePath, false, addChanMode, indArr, 3, 'FULL_SEG');
+%load_split_save('traGt', traGtFiles, dataPath, savePath, false, addChanMode, indArr, 3, 'FULL_SEG');
 %load_split_save('traOb', traObFiles, dataPath, savePath, false,   addChanMode, indArr, 3, 'FULL_SEG');
 %load_split_save('traOb', traObFiles, dataPath, savePath, addChan, addChanMode, indArr, 3, 'FULL_SEG');
 %load_split_save('valGt', valGtFiles, workPath, false, addChanMode, 100:5:245, 1, 'FULL');
 %load_split_save('valOb', valObFiles, workPath, false, addChanMode, 100:5:245, 1, 'FULL');
+
+%load_split_save('traOb', traObFiles, dataPath, savePath, false,   addChanMode, indArr, 3, 'FULL_SEG_1000');
+%load_split_save('traOb', traObFiles, dataPath, savePath, addChan, addChanMode, indArr, 3, 'FULL_SEG_1000');
+%load_split_save('valOb', valObFiles, dataPath, savePath, addChan, addChanMode, 100:5:245,1,'FULL_SEG_1000');
+ load_split_save('valOb', valObFiles, dataPath, savePath, addChan, addChanMode, indArr, 1, 'FULL_SEG_1000_FULL');
 %load_split_save('valOb', valObFiles, workPath, addChan, addChanMode, 100:5:245, 1, 'FULL');
 
 %% Utility functions
