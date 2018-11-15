@@ -2517,15 +2517,15 @@ para_str_70 = 'Idx_70-Loss_l1-Loss_gradient_type_1_w_50-Loss_preMask_p02-Reg_no-
 
 # re-run 68 with 1000_data
 para_dict_71 = para_dict_68.copy()
-para_dict_71['Ob'] = 'FULL_SEG__1000_3C_motion'
+para_dict_71['Ob'] = 'FULL_SEG_1000_3C_motion'
 para_str_71 = 'Idx_71-Nagini_Octo_1000'
 
 #para_dict_use = para_dict_42
 #para_str_use = para_str_42
 # para_dict_use_train = para_dict_58
 # para_str_use_train = para_str_58
-para_dict_use_train = para_dict_69
-para_str_use_train = para_str_69
+para_dict_use_train = para_dict_71
+para_str_use_train = para_str_71
 
 para_dict_use_test = para_dict_46
 para_str_use_test = para_str_46

@@ -321,11 +321,8 @@ def assign_silce_idx(total_count, binSliceStart=1, binSliceEnd=96):
 #     return ori_dict_list 
 def get_data_provider(para_dict_use, mode = 'train', DEBUG_MODE = False):
     # data_cls_num = para_dict_use['kwargs'].get('n_classes',1)
-    if type(para_dict_use['kwargs']) == list:
-        data_cls_num = 16
-        # data_cls_num = 1
-    elif type(para_dict_use['kwargs']['structure']) == str:
-        data_cls_num = para_dict_use['kwargs'].get('n_classes',1)    
+    if type(para_dict_use['kwargs']['structure']) == str:
+        data_cls_num = para_dict_use['kwargs'].get('n_classes',1)
     else:
         data_cls_num = para_dict_use['kwargs']['structure'].get('n_classes', 1)
     # print(data_cls_num)
@@ -334,16 +331,24 @@ def get_data_provider(para_dict_use, mode = 'train', DEBUG_MODE = False):
         if ('3C' in para_dict_use['Ob']):
             data_channels = 3 
             if 'motion' in para_dict_use['Ob']:
-                if ('FULL_SEG' in para_dict_use['Ob']):            
-                    if mode == 'train':
-                        data = h5py_mat2npy('../data/train_np/traOb_FULL_SEG_neigh_motion_part_2.mat')
-                        # print(data.shape)
-                        data_cls = idx_classify(assign_silce_idx(np.shape(data)[0]),n_classes = data_cls_num, mode='equally')
-                        #data_cls = idx_classify(np.arange(100, 245+1, 5), mode='equally_960')
-                    elif mode == 'test' or mode == 'valid':
-                        data = None
+                if ('FULL_SEG' in para_dict_use['Ob']):
+                    if ('1000' in para_dict_use['Ob']):
+                        if mode == 'train':
+                            data = h5py_mat2npy('../data/train_np/traOb_FULL_SEG_1000_neigh_motion_part_2.mat')
+                            data_cls = idx_classify(assign_silce_idx(np.shape(data)[0]),n_classes = data_cls_num, mode='equally')
+                            #data_cls = idx_classify(np.arange(100, 245+1, 5), mode='equally_960')
+                        elif mode == 'test' or mode == 'valid':
+                            data = None
+                        vdata = h5py_mat2npy('../data/valid_np/valOb_FULL_SEG_1000_neigh_motion.mat')
+                    else:
+                        if mode == 'train':
+                            data = h5py_mat2npy('../data/train_np/traOb_FULL_SEG_neigh_motion_part_2.mat')
+                            data_cls = idx_classify(assign_silce_idx(np.shape(data)[0]),n_classes = data_cls_num, mode='equally')
+                            #data_cls = idx_classify(np.arange(100, 245+1, 5), mode='equally_960')
+                        elif mode == 'test' or mode == 'valid':
+                            data = None
+                        vdata = h5py_mat2npy('../data/valid_np/valOb_neigh_motion.mat')
                     
-                    vdata = h5py_mat2npy('../data/valid_np/valOb_neigh_motion.mat')
                     # vdata_cls = idx_classify(assign_silce_idx(np.shape(vdata)[0]), mode='equally_960')
                     vdata_idx = np.arange(100, 245+1, 5)%96
                     vdata_idx[vdata_idx==0] = 96
@@ -374,32 +379,46 @@ def get_data_provider(para_dict_use, mode = 'train', DEBUG_MODE = False):
         if ('3C' in para_dict_use['Ob']):
             data_channels = 3 
             if 'motion' in para_dict_use['Ob']:
-                if ('FULL_SEG' in para_dict_use['Ob']):   
+                if ('FULL_SEG' in para_dict_use['Ob']):
                     if mode == 'train':         
+                        if ('1000' in para_dict_use['Ob']):
                         # data = h5py_mat2npy('train_np/traOb_FULL_SEG_neigh_motion_part_1.mat')
-                        data1 = h5py_mat2npy('../data/train_np/traOb_FULL_SEG_neigh_motion_part_1.mat')
-                        data2 = h5py_mat2npy('../data/train_np/traOb_FULL_SEG_neigh_motion_part_2.mat')
-                        data3 = h5py_mat2npy('../data/train_np/traOb_FULL_SEG_neigh_motion_part_3.mat')
-                        data  = np.concatenate([data1, data2, data3], axis=0)    
+                            data1 = h5py_mat2npy('../data/train_np/traOb_FULL_SEG_1000_neigh_motion_part_1.mat')
+                            data2 = h5py_mat2npy('../data/train_np/traOb_FULL_SEG_1000_neigh_motion_part_2.mat')
+                            data3 = h5py_mat2npy('../data/train_np/traOb_FULL_SEG_1000_neigh_motion_part_3.mat')
+                            data  = np.concatenate([data1, data2, data3], axis=0)    
+                            vdata = h5py_mat2npy('../data/valid_np/valOb_FULL_SEG_1000_neigh_motion.mat')
+                        else:
+                            data1 = h5py_mat2npy('../data/train_np/traOb_FULL_SEG_neigh_motion_part_1.mat')
+                            data2 = h5py_mat2npy('../data/train_np/traOb_FULL_SEG_neigh_motion_part_2.mat')
+                            data3 = h5py_mat2npy('../data/train_np/traOb_FULL_SEG_neigh_motion_part_3.mat')
+                            data  = np.concatenate([data1, data2, data3], axis=0)    
+                            vdata = h5py_mat2npy('../data/valid_np/valOb_neigh_motion.mat')
                         data_cls = idx_classify(assign_silce_idx(np.shape(data)[0]), n_classes = data_cls_num, mode='equally')
                         # print('Observation_size')
                         # print(np.shape(data)[0])
                         # print('data_cls (at image_utils.py): ')
                         # print(data_cls)
                         del(data1, data2, data3)
-                        vdata = h5py_mat2npy('../data/valid_np/valOb_neigh_motion.mat')
+                        
                         vdata_idx = np.arange(100, 245+1, 5)%96
                         vdata_idx[vdata_idx==0] = 96
                         # vdata_cls = idx_classify(np.arange(100, 245+1, 5),n_classes = data_cls_num, mode='equally_96')    
                         vdata_cls = idx_classify(vdata_idx,n_classes = data_cls_num, mode='equally_96')    
                     elif mode == 'test' or mode == 'valid':
                         data = None
-                        vdata = h5py_mat2npy('../data/valid_np/valOb_neigh_motion_FULL.mat')
+                        if ('1000' in para_dict_use['Ob']):
+                            vdata = h5py_mat2npy('../data/valid_np/valOb_neigh_motion_FULL.mat')
+                        else:
+                            vdata = h5py_mat2npy('../data/valid_np/valOb_FULL_SEG_1000_neigh_motion.mat')
                         vdata_cls = idx_classify(assign_silce_idx(np.shape(vdata)[0]),n_classes = data_cls_num, mode = 'equally')
                         # vdata_cls = idx_classify(np.arange(100, 245+1, 5), mode='equally_960')
                     elif mode == 'test_on_train':
                         data=None
-                        vdata = h5py_mat2npy('../data/train_np/traOb_FULL_SEG_neigh_motion_part_1.mat')[np.arange(99,245,5),:,:,:]
+                        if ('1000' in para_dict_use['Ob']):
+                            vdata = h5py_mat2npy('../data/train_np/traOb_FULL_SEG_neigh_motion_part_1.mat')[np.arange(99,245,5),:,:,:]
+                        else:
+                            vdata = h5py_mat2npy('../data/train_np/traOb_FULL_SEG_1000_neigh_motion_part_1.mat')[np.arange(99,245,5),:,:,:]
                         # idx = np.arange(99,245,5)                        
                         vdata_idx = np.arange(100, 245+1, 5)%96
                         vdata_idx[vdata_idx==0] = 96
@@ -436,7 +455,7 @@ def get_data_provider(para_dict_use, mode = 'train', DEBUG_MODE = False):
     #     while np.sum(cls_array[cls_array==currentCls]) != 0:
     #         currentCls += 1
     #     return currentCls
-    # print(data.shape)
+
     # print(vdata_cls)
     mask_time = {'year':2018,
            'month':11,
@@ -503,7 +522,7 @@ def get_data_provider(para_dict_use, mode = 'train', DEBUG_MODE = False):
     else:
         data_masks = None
         vdata_masks = None
-    # print(data.shape)
+
     for idx, ignore_class in enumerate(ignore_classes):
         ignore_class -= idx
         data = data[data_cls != ignore_class,:,:,:]
@@ -534,7 +553,6 @@ def get_data_provider(para_dict_use, mode = 'train', DEBUG_MODE = False):
         vdata_masks += para_dict_use.get('preMaskAdd', 0)
     
     if mode == 'train':
-        # print(data.shape)
         data_provider = SimpleDataProvider(data, truths, data_cls = data_cls, data_cls_num=data_cls_num, process_dict = para_dict_use['proc_dict'], onehot_cls=True, verbose=False, masks = data_masks)
     elif mode == 'test' or mode == 'valid' or mode == 'test_on_train':
         data_provider = None
