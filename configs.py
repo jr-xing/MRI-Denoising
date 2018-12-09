@@ -57,16 +57,16 @@ para_dict_73['server'] = 2
 para_dict_73['GPU_IND'] = '3'
 para_str_73 = 'Idx_73-Loss_l2-Loss_gradient_type_3_w_100_masked_mid5-Reg_no-Drop_0.8-Ob_FULL_SEG_3C_motion_T800-Gt_FULL_SEG-LessClass-Hydra4_2_16_Ouroboros'
 
-# para_dict_74 = para_dict_72.copy()
-# para_dict_74['ObSampleLineNum'] = 1200
-# para_dict_74['server'] = 1
-# para_dict_74['GPU_IND'] = '2'
-# para_str_74 = 'Idx_74-Loss_l2-Loss_gradient_type_3_w_100_masked_mid5-Reg_no-Drop_0.8-Ob_FULL_SEG_3C_motion_T1200-Gt_FULL_SEG-LessClass-Hydra4_2_16_Ouroboros'
+para_dict_74 = para_dict_72.copy()
+para_dict_74['ObSampleLineNum'] = 1200
+para_dict_74['server'] = 1
+para_dict_74['GPU_IND'] = '3'
+para_str_74 = 'Idx_74-Loss_l2-Loss_gradient_type_3_w_100_masked_mid5-Reg_no-Drop_0.8-Ob_FULL_SEG_3C_motion_T1200-Gt_FULL_SEG-LessClass-Hydra4_2_16_Ouroboros'
 
 para_dict_75 = para_dict_72.copy()
 para_dict_75['ObSampleLineNum'] = 1600
 para_dict_75['server'] = 1
-para_dict_75['GPU_IND'] = '3'
+para_dict_75['GPU_IND'] = '2'
 para_str_75 = 'Idx_75-Loss_l2-Loss_gradient_type_3_w_100_masked_mid5-Reg_no-Drop_0.8-Ob_FULL_SEG_3C_motion_T1600-Gt_FULL_SEG-LessClass-Hydra4_2_16_Ouroboros'
 
 # para_dict_76 = para_dict_72.copy()
@@ -78,7 +78,7 @@ para_str_75 = 'Idx_75-Loss_l2-Loss_gradient_type_3_w_100_masked_mid5-Reg_no-Drop
 
 
 
-para_dict_use_train = para_dict_73
-para_str_use_train = para_str_73
+para_dict_use_train = para_dict_74
+para_str_use_train = para_str_74
 para_dict_use_test = para_dict_72
 para_str_use_test = para_str_72
