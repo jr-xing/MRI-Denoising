@@ -252,7 +252,78 @@ para_dict_85 = {
     'GPU_IND':'3'
 }
 
-para_dict_use_train = para_dict_85
-para_str_use_train = para_str_85
+para_str_86 = 'Idx_86-Loss_l2-Loss_gradient_type_2_w_100_masked_mid5-Reg_no-Drop_0.8-Ob_FULL_SEG_3C_motion_T400-Gt_FULL_SEG-LessClass-Nagini_4_Ouroboros'
+para_dict_86 = {
+    'idx':86,
+    'losses':[
+        {
+        'name':'l2',
+        'weight':1,
+        'mask':None},
+        {
+        'name':'edge',
+        'edge_type':'gradient',
+        'weight':100,
+        'mask':'mid5',
+        'mask_before_operate':False,
+        'get_XY':True,
+	    'type':'2',
+        'invalid_last':0
+        }],
+    'reg':None,
+    'Keep':0.8,
+    'Ob':'FULL_SEG_3C_motion',
+    'ObSampleLineNum': 400,
+    'Gt':'FULL_SEG',
+    'ignore_classes':[0,1,13,14,15],
+    # 'ignore_classes':[14,15],
+    'kwargs' : {
+        "layers": 4,           # how many resolution levels we want to have
+        "conv_times": 2,       # how many times we want to convolve in each level
+        "features_root": 64,   # how many feature_maps we want to have as root (the following levels will calculate the feature_map by multiply by 2, exp, 64, 128, 256)
+        "filter_size": 3,      # filter size used in convolution
+        "pool_size": 2,        # pooling size used in max-pooling
+        "summaries": True,
+        "get_loss_dict": True,
+        "batch_size": 5,
+        "valid_size": 5,
+        'structure':{
+            'type':'Nagini',
+            'GAN':False,
+            'Ouroboros':True,
+            'neck_len': 2,
+            'n_classes': 16
+        },
+    },
+    'proc_dict':{
+        'data':{},
+        'truth':{}        
+    },
+    'epochs':200,
+    'optimizer': 'adam',
+    'server': '1',
+    'GPU_IND':'2'
+}
+
+para_dict_87 = para_dict_86.copy()
+para_dict_87['ObSampleLineNum'] = 800
+para_dict_87['server'] = '1'
+para_dict_87['GPU_IND'] = '3'
+para_str_87 = 'Idx_87-Loss_l2-Loss_gradient_type_2_w_100_masked_mid5-Reg_no-Drop_0.8-Ob_FULL_SEG_3C_motion_T800-Gt_FULL_SEG-LessClass-Nagini_4_Ouroboros'
+
+para_dict_88 = para_dict_86.copy()
+para_dict_88['ObSampleLineNum'] = 1200
+para_dict_88['server'] = '2'
+para_dict_88['GPU_IND'] = '2'
+para_str_88 = 'Idx_88-Loss_l2-Loss_gradient_type_2_w_100_masked_mid5-Reg_no-Drop_0.8-Ob_FULL_SEG_3C_motion_T1200-Gt_FULL_SEG-LessClass-Nagini_4_Ouroboros'
+
+para_dict_89 = para_dict_86.copy()
+para_dict_89['ObSampleLineNum'] = 1600
+para_dict_89['server'] = '2'
+para_dict_89['GPU_IND'] = '3'
+para_str_89 = 'Idx_89-Loss_l2-Loss_gradient_type_2_w_100_masked_mid5-Reg_no-Drop_0.8-Ob_FULL_SEG_3C_motion_T1600-Gt_FULL_SEG-LessClass-Nagini_4_Ouroboros'
+
+para_dict_use_train = para_dict_86
+para_str_use_train = para_str_86
 para_dict_use_test = para_dict_72
 para_str_use_test = para_str_72
