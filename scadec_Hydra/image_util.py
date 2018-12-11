@@ -456,6 +456,50 @@ def get_data_provider(para_dict_use, mode = 'train', DEBUG_MODE = False):
                         # vdata_cls = idx_classify(np.arange(100, 245+1, 5),n_classes = data_cls_num, mode='equally_96')    
                         vdata_cls = idx_classify(vdata_idx,n_classes = data_cls_num, mode='equally_96')    
                         # vdata_cls = idx_classify(assign_silce_idx(np.shape(vdata)[0]),n_classes = data_cls_num, mode = 'equally')
+        else:
+            data_channels = 3 
+            if mode == 'train':                        
+                if para_dict_use.get('ObSampleLineNum', False):
+                    sampleLineNum = para_dict_use.get('ObSampleLineNum', False)
+                    if mode == 'train':
+                        data1 = h5py_mat2npy('../data/train_np/traOb' + '_T=' + str(sampleLineNum) + '_part_1.mat')
+                        data2 = h5py_mat2npy('../data/train_np/traOb' + '_T=' + str(sampleLineNum) + '_part_2.mat')
+                        data3 = h5py_mat2npy('../data/train_np/traOb' + '_T=' + str(sampleLineNum) + '_part_3.mat')
+                        data  = np.concatenate([data1, data2, data3], axis=0)
+                        data_cls = idx_classify(assign_silce_idx(np.shape(data)[0]),n_classes = data_cls_num, mode='equally')
+                        vdata = h5py_mat2npy('../data/valid_np/valOb' + '_T=' + str(sampleLineNum) + '.mat')
+                    elif mode == 'test' or mode == 'valid':
+                        data = None
+                    vdata = h5py_mat2npy('../data/valid_np/valOb' + '_T=' + str(sampleLineNum) + '.mat')
+                else:
+                    pass
+                data_cls = idx_classify(assign_silce_idx(np.shape(data)[0]), n_classes = data_cls_num, mode='equally')            
+                del(data1, data2, data3)
+                
+                vdata_idx = np.arange(100, 245+1, 5)%96
+                vdata_idx[vdata_idx==0] = 96
+                vdata_cls = idx_classify(vdata_idx,n_classes = data_cls_num, mode='equally_96')    
+            elif mode == 'test' or mode == 'valid':
+                data = None
+                if para_dict_use.get('ObSampleLineNum', False):
+                    vdata = h5py_mat2npy('../data/valid_np/valOb' + '_T=' + str(sampleLineNum) + '.mat')
+                else:
+                    pass
+                vdata_cls = idx_classify(assign_silce_idx(np.shape(vdata)[0]),n_classes = data_cls_num, mode = 'equally')
+                # vdata_cls = idx_classify(np.arange(100, 245+1, 5), mode='equally_960')
+            elif mode == 'test_on_train':
+                data=None
+                if ('1000' in para_dict_use['Ob']):
+                    vdata = h5py_mat2npy('../data/train_np/traOb_FULL_SEG_neigh_motion_part_1.mat')[np.arange(99,245,5),:,:,:]
+                else:
+                    vdata = h5py_mat2npy('../data/train_np/traOb_FULL_SEG_1000_neigh_motion_part_1.mat')[np.arange(99,245,5),:,:,:]
+                # idx = np.arange(99,245,5)                        
+                vdata_idx = np.arange(100, 245+1, 5)%96
+                vdata_idx[vdata_idx==0] = 96
+                # vdata_cls = idx_classify(np.arange(100, 245+1, 5),n_classes = data_cls_num, mode='equally_96')    
+                vdata_cls = idx_classify(vdata_idx,n_classes = data_cls_num, mode='equally_96')    
+
+
 
         # Ground truth / Target clean data
         if ('3C' in para_dict_use['Gt']):
