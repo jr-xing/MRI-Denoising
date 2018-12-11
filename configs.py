@@ -133,7 +133,7 @@ para_str_79 = 'Idx_79-Loss_l2-Reg_no-Drop_0.8-Ob_FULL_SEG_3C_motion_T1200-Gt_FUL
 para_dict_80 = para_dict_77.copy()
 para_dict_80['ObSampleLineNum'] = 1600
 para_dict_80['server'] = '2'
-para_dict_80['GPU_IND'] = '0'
+para_dict_80['GPU_IND'] = '1'
 para_str_80 = 'Idx_80-Loss_l2-Reg_no-Drop_0.8-Ob_FULL_SEG_3C_motion_T1600-Gt_FULL_SEG-LessClass-Nagini_4_Ouroboros'
 
 para_str_81 = 'Idx_81-Loss_l2-Loss_gradient_type_3_w_100_masked_mid5-Reg_no-Drop_0.8-Ob_FULL_SEG_3C_motion_T400-Gt_FULL_SEG-LessClass-Nagini_4_Ouroboros'
