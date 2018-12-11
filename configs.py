@@ -208,7 +208,7 @@ para_dict_84['GPU_IND'] = '2'
 para_str_84 = 'Idx_84-Loss_l2-Loss_gradient_type_3_w_100_masked_mid5-Reg_no-Drop_0.8-Ob_FULL_SEG_3C_motion_T1600-Gt_FULL_SEG-LessClass-Nagini_4_Ouroboros'
 
 
-para_dict_use_train = para_dict_83
-para_str_use_train = para_str_83
+para_dict_use_train = para_dict_79
+para_str_use_train = para_str_79
 para_dict_use_test = para_dict_72
 para_str_use_test = para_str_72
