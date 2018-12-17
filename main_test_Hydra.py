@@ -11,10 +11,12 @@ pprint.pprint(para_dict_use_test)
 # here indicating the GPU you want to use. if you don't have GPU, just leave it.
 gpu_ind = para_dict_use_test.get('GPU_IND', '0')
 # os.environ['CUDA_VISIBLE_DEVICES'] = gpu_ind # 0,1,2,3
-os.environ['CUDA_VISIBLE_DEVICES'] = '0' # 0,1,2,3
+os.environ['CUDA_VISIBLE_DEVICES'] = '3' # 0,1,2,3
 
 #%% Load data
 from scadec_Hydra.image_util import get_data_provider
+# from scadec_Hydra_new.get_data_provider import get_data_provider
+# from scadec_Hydra_new.image_util_new import SimpleDataProvider
 DEBUG_MODE = False
 NOTE_PSNR = False
 TEST_ON_TRAIN = False

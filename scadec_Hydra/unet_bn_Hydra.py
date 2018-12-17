@@ -93,10 +93,12 @@ class Unet_bn(object):
         self.structure = kwargs.get('structure',{'type':'Hydra'})
         if type(self.structure) == dict:
             self.structure_type = self.structure['type']
-            self.batch_cls = tf.placeholder(tf.int32,[None, kwargs['structure'].get('n_classes',1) - 5], name='batch_cls')
+            self.batch_cls = tf.placeholder(tf.int32,[None, kwargs['structure'].get('n_classes',1)], name='batch_cls')
+            # self.batch_cls = tf.placeholder(tf.int32,[None, kwargs['structure'].get('n_classes',1) - 5], name='batch_cls')
         else:
             self.structure_type = self.structure
-            self.batch_cls = tf.placeholder(tf.int32,[None, kwargs.get('n_classes',1) - 5], name='batch_cls')
+            self.batch_cls = tf.placeholder(tf.int32,[None, kwargs.get('n_classes',1)], name='batch_cls')
+            # self.batch_cls = tf.placeholder(tf.int32,[None, kwargs.get('n_classes',1) - 5], name='batch_cls')
         
         if kwargs.pop('no_GAN_net_func', False):
             if self.structure_type == 'Hydra' or self.structure_type == 'HydraEr':

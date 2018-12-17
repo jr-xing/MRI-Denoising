@@ -11,6 +11,10 @@ pprint.pprint(para_dict_use_train)
 gpu_ind = para_dict_use_train.get('GPU_IND', '3')
 os.environ['CUDA_VISIBLE_DEVICES'] = gpu_ind # 0,1,2,3
 
+import tensorflow as tf
+config = tf.ConfigProto()
+config.gpu_options.allow_growth = True
+
 #%% Load data
 from scadec_Hydra.image_util import get_data_provider
 data_provider, valid_provider, data_channels, truth_channels, training_iters = get_data_provider(para_dict_use_train, 'train', DEBUG_MODE=False)

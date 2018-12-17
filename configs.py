@@ -542,7 +542,7 @@ para_dict_96['server'] = '1'
 para_dict_96['GPU_IND'] = '2'
 para_str_96 = 'Idx_96-Loss_l2-Reg_no-Drop_0.8-Ob_FULL_SEG_3C_motion_T1600-Gt_FULL_SEG-LessClass-Nagini_4_Ouroboros'
 
-para_dict_use_train = para_dict_91
-para_str_use_train = para_str_91
-para_dict_use_test = para_dict_82
-para_str_use_test = para_str_82
+para_dict_use_train = para_dict_96
+para_str_use_train = para_str_96
+para_dict_use_test = para_dict_85
+para_str_use_test = para_str_85
