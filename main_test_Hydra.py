@@ -2,22 +2,23 @@ import numpy as np
 import os
 
 #%% Load Configuration
-from configs_Hrdra import para_dict_use_test, para_str_use_test
+# from configs_Hrdra import para_dict_use_test, para_str_use_test
+from configs import para_dict_use_test, para_str_use_test
 import pprint
 pprint.pprint('Running test: '+ para_str_use_test)
 pprint.pprint(para_dict_use_test)
 
 # here indicating the GPU you want to use. if you don't have GPU, just leave it.
-gpu_ind = para_dict_use_test.get('GPU_IND', '3')
+gpu_ind = para_dict_use_test.get('GPU_IND', '0')
 # os.environ['CUDA_VISIBLE_DEVICES'] = gpu_ind # 0,1,2,3
-os.environ['CUDA_VISIBLE_DEVICES'] = '1' # 0,1,2,3
+os.environ['CUDA_VISIBLE_DEVICES'] = '0' # 0,1,2,3
 
 #%% Load data
 from scadec_Hydra.image_util import get_data_provider
 DEBUG_MODE = False
 NOTE_PSNR = False
-TEST_ON_TRAIN = True
-data_provider, valid_provider, data_channels, truth_channels, training_iters = get_data_provider(para_dict_use_test, 'test_on_train', DEBUG_MODE=DEBUG_MODE)
+TEST_ON_TRAIN = False
+data_provider, valid_provider, data_channels, truth_channels, training_iters = get_data_provider(para_dict_use_test, 'test', DEBUG_MODE=DEBUG_MODE)
 
 # -----------------------------------Loss------------------------------------------------------- #
 losses_dict = para_dict_use_test['losses']
@@ -39,8 +40,9 @@ net = Unet_bn(img_channels=data_channels, truth_channels=truth_channels, cost_di
 ####################################################
 
 num = valid_provider.size
+print('num: {}'.format(num))
 predicts = []
-valid_x, valid_y, batch_cls = valid_provider('full')
+valid_x, valid_y, batch_cls, mask = valid_provider('full')
 model_path =  '../result/gpu' + str(gpu_ind) + '/' + para_str_use_test + '/models/final/model.cpkt'
 
 if DEBUG_MODE:
@@ -64,11 +66,14 @@ test_batch_size = 5
 test_batch_num = int(num/test_batch_size)
 
 # Average psnr for each class
-n_cls = kwargs.get('n_classes', 1)
+# n_cls = kwargs.get('n_classes', 1)
+n_cls = kwargs['structure'].get('n_classes', 1) - len(para_dict_use_test['ignore_classes'])
 avg_psnr_cls = [0]*n_cls
+avg_psnr = 0
 
 from scadec_Hydra import util
 for batchIdx in range(test_batch_num):
+# for batchIdx in range(2):
 
     print('')
     # print('')
@@ -92,7 +97,13 @@ for batchIdx in range(test_batch_num):
     test_inputs = util.concat_n_images(x)    
     test_targets = util.concat_n_images(y)
     test_outputs = util.concat_n_images(predict)
-    if NOTE_PSNR:        
+
+    batch_psnr = util.computePSNRs(test_targets, test_inputs)
+    print('batch PSNR:')
+    print(batch_psnr)
+    avg_psnr += np.sum(batch_psnr)
+
+    if NOTE_PSNR:
         batch_inputs_psnr_str = ['PSNR: %.3f'%psnr  for psnr in list(util.computePSNRs(test_targets, test_inputs))]
         batch_outputs_psnr_str = ['PSNR: %.3f'%psnr for psnr in list(util.computePSNRs(test_targets, test_outputs))]
         batch_inputs_str = list(zip(batch_inputs_psnr_str, x_cls_str))
@@ -111,12 +122,17 @@ util.save_mat(predicts, test_save_path+'/test.mat')
 
 for idx in range(len(avg_psnr_cls)):
     avg_psnr_cls[idx] = avg_psnr_cls[idx] / (96/n_cls)
-print('PSNR for each class:')
+avg_psnr = avg_psnr/num
+print('AVG PSNR:')
+print(avg_psnr)
+print('AVG PSNR for each class:')
 print(avg_psnr_cls)
 
 file = open("{}/avg_psnr.txt".format(test_save_path),"w") 
 file.write("PSNR for each class:")
 file.write(str(avg_psnr_cls))
+file.write("AVG PSNR:")
+file.write(str(avg_psnr))
 file.close()
 # file.write(“Hello World”) 
 # file.write(“This is our new text file”) 
